@@ -1,64 +1,95 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdint.h>
-#include <time.h>
+#include "../../include/silvr.h"
+#include <signal.h>
 #include <unistd.h>
 
-#define SILVR_MAX_SUPPLY     4200000000000000ULL
-#define SILVR_INITIAL_REWARD 5000000000ULL
-#define SILVR_HALVING        420000
-#define SILVR_TREASURY_PCT   5
-#define SILVR_BLOCK_TIME     300
-#define SILVR_PORT           8633
-#define SILVR_CHAIN_ID       2026
+static volatile int running = 1;
 
-/* YOUR WALLET ADDRESS GOES HERE */
-#define MINER_ADDRESS "b602a8cf49b570cc815b0841474fe3c547a36fd3acfd00aca5afe3d51faa7077"
-
-uint64_t block_reward(uint32_t height) {
-    uint64_t reward = SILVR_INITIAL_REWARD;
-    uint32_t halvings = height / SILVR_HALVING;
-    if (halvings >= 64) return 0;
-    return reward >> halvings;
+void handle_signal(int sig) {
+    printf("\nSILVR node shutting down...\n");
+    running = 0;
 }
 
-uint64_t treasury_cut(uint32_t height) {
-    return block_reward(height) * SILVR_TREASURY_PCT / 100;
-}
+int main(int argc, char *argv[]) {
+    signal(SIGINT, handle_signal);
+    signal(SIGTERM, handle_signal);
 
-uint64_t miner_reward(uint32_t height) {
-    return block_reward(height) - treasury_cut(height);
-}
-
-void mine_block(uint32_t height, uint64_t *total) {
-    uint64_t reward = miner_reward(height);
-    uint64_t treasury = treasury_cut(height);
-    *total += reward;
-    printf("Block %u mined\n", height);
-    printf("  Address      : %s\n", MINER_ADDRESS);
-    printf("  Miner reward : %.8f SILVR\n", (double)reward / 1e8);
-    printf("  Treasury     : %.8f SILVR\n", (double)treasury / 1e8);
-    printf("  Total mined  : %.8f SILVR\n\n", (double)*total / 1e8);
-}
-
-int main() {
     printf("\n");
-    printf("================================\n");
-    printf("  SILVR Node v1.0\n");
-    printf("  Chain ID : %d\n", SILVR_CHAIN_ID);
-    printf("  Port     : %d\n", SILVR_PORT);
-    printf("  Miner    : %s\n", MINER_ADDRESS);
-    printf("  Genesis  : The People's Chain\n");
-    printf("================================\n\n");
+    printf("================================================\n");
+    printf("  SILVR Node v1.0 - Production\n");
+    printf("  Chain ID    : %d\n", SILVR_CHAIN_ID);
+    printf("  Port        : %d\n", SILVR_PORT);
+    printf("  Max Supply  : %llu SILVR\n",
+           (unsigned long long)SILVR_MAX_SUPPLY);
+    printf("  Block Time  : %d seconds\n", SILVR_BLOCK_TIME);
+    printf("  Genesis     : The People's Chain\n");
+    printf("================================================\n\n");
 
-    uint32_t height = 0;
-    uint64_t total = 0;
+    /* Create miner wallet */
+    silvr_wallet_t miner_wallet;
 
-    while (1) {
-        mine_block(height, &total);
+    if (argc > 1) {
+        /* Load from private key hex argument */
+        uint8_t privkey[32];
+        const char *hex = argv[1];
+        for (int i = 0; i < 32; i++) {
+            unsigned int byte;
+            sscanf(hex + 2*i, "%02x", &byte);
+            privkey[i] = (uint8_t)byte;
+        }
+        silvr_wallet_from_privkey(&miner_wallet, privkey);
+        printf("Loaded existing wallet\n");
+    } else {
+        /* Generate new wallet */
+        silvr_wallet_create(&miner_wallet);
+        printf("Generated new wallet\n");
+    }
+
+    silvr_wallet_print(&miner_wallet);
+
+    /* Mining loop */
+    silvr_block_t block;
+    memset(&block, 0, sizeof(block));
+
+    silvr_height_t height = 0;
+    uint64_t total_mined = 0;
+    uint32_t difficulty = 1;
+
+    printf("Starting mining...\n\n");
+
+    while (running) {
+        memset(&block, 0, sizeof(block));
+        block.header.height = height;
+        block.header.version = 1;
+
+        /* Mine the block */
+        silvr_mine_block(&block, difficulty);
+
+        uint64_t reward = silvr_miner_reward(height);
+        uint64_t treasury = silvr_treasury_cut(height);
+        total_mined += reward;
+
+        /* Print block info */
+        printf("Block #%u mined\n", height + 1);
+        printf("  Miner    : %s\n", miner_wallet.address);
+        printf("  Reward   : %.8f SILVR\n",
+               (double)reward / 1e8);
+        printf("  Treasury : %.8f SILVR\n",
+               (double)treasury / 1e8);
+        printf("  Total    : %.8f SILVR\n\n",
+               (double)total_mined / 1e8);
+
         height++;
+
+        /* Adjust difficulty every 2016 blocks */
+        if (height % 2016 == 0) {
+            difficulty++;
+            printf("Difficulty adjusted to %u\n\n", difficulty);
+        }
+
         sleep(1);
     }
+
+    printf("Total mined: %.8f SILVR\n",
+           (double)total_mined / 1e8);
     return 0;
 }
