@@ -1,0 +1,28 @@
+# Compiled binaries
+silvrd
+*.o
+*.a
+*.so
+
+# Build directories
+build/
+dist/
+
+# Data files
+data/
+*.dat
+*.log
+
+# Editor files
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Progress files
+silvr_progress.txt
+blockchain.dat
+utxo.dat
