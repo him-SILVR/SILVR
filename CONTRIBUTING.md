@@ -57,4 +57,17 @@ Wait for community discussion before building.
 ## Community
 
 Twitter  : https://twitter.com/SILVRprotocol
-Telegram : SILVR Official​​​​​​​​​​​​​​​​
+Telegram : SILVR Official
+
+---
+
+## Rules
+
+- Be respectful to all contributors
+- No spam or self promotion
+- Technical discussions only in Issues
+- English language preferred
+
+---
+
+"2026/01/01 Silver: The People's Chain"
