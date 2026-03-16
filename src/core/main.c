@@ -39,9 +39,13 @@ int main(int argc, char *argv[]) {
         silvr_wallet_from_privkey(&miner_wallet, privkey);
         printf("Loaded existing wallet\n");
     } else {
-        /* Generate new wallet */
-        silvr_wallet_create(&miner_wallet);
-        printf("Generated new wallet\n");
+    /* Use hardcoded miner address */
+    strncpy(miner_wallet.address,
+        "SWLswgMRtZ8hn2VHxtJ4EJX46C4fKXDWrE",
+        sizeof(miner_wallet.address)-1);
+    printf("Using miner address\n");
+}
+
     }
 
     silvr_wallet_print(&miner_wallet);
