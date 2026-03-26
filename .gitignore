@@ -26,3 +26,11 @@ Thumbs.db
 silvr_progress.txt
 blockchain.dat
 utxo.dat
+blockchain.dat
+*.log
+private_key.txt
+wallet.dat
+silvr_master_bot.py
+*.exe
+*.o
+
