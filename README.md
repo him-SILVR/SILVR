@@ -20,8 +20,6 @@ No ICO. No presale. No VC.
 
 ## Build and Run
 
-Linux or WSL2 on Windows:
-
 sudo apt install gcc libssl-dev make
 git clone https://github.com/him-SILVR/SILVR.git
 cd SILVR
