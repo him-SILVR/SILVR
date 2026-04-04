@@ -1,19 +1,22 @@
 # SILVR Node Status
 
-| Node | Status |
-|------|--------|
-| Node 1 — Laptop WSL2 | Running |
-| Node 2 — Replit | Running |
-| Node 3 | Needed — DM us |
+| Node | Location | Blocks | Status |
+|------|----------|--------|--------|
+| Node 1 | Laptop WSL2 | 67,000+ | Running |
+| Node 2 | Replit | 5,000+ | Running |
+| Node 3 | Volunteer needed | 0 | Needed |
 
-Updated: March 26, 2026
+Updated: April 2, 2026
 
-## Run Your Own Node
+## Want to run Node 3?
+
+You become part of SILVR history.
 
 git clone https://github.com/him-SILVR/SILVR.git
 cd SILVR
 make
-./silvrd
+./silvrd YOUR_ADDRESS
 
-DM @SILVRprotocol on Twitter to connect your node.
+DM @SILVRprotocol on Twitter.
 Every node makes SILVR stronger.
+The People's Chain.
