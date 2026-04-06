@@ -71,3 +71,11 @@ GitHub: https://github.com/him-SILVR/SILVR
 ## License
 
 MIT — Open source forever
+### For Windows Users (MSYS2)
+
+1. Install MSYS2 from https://www.msys2.org
+2. Open MSYS2 terminal
+3. Navigate to folder: `cd /e/SILVR`
+4. Build: `make`
+5. Run: `./silvrd.exe YOUR_ADDRESS`
+
