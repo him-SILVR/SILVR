@@ -5,6 +5,7 @@ LDFLAGS = -lssl -lcrypto -lm -lsecp256k1
 SRCS = src/core/main.c \
        src/core/crypto.c \
        src/core/transaction.c \
+       src/core/quantum_safe.c \
        src/wallet/wallet.c \
        src/consensus/consensus.c \
        src/network/network.c \
