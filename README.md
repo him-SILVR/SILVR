@@ -14,10 +14,13 @@ We are building in public. No lies.
 | Chain ID | 2026 |
 | Ticker | SILVR |
 | Max Supply | 42,000,000 SILVR |
-| Block Reward | 50 SILVR |
-| Blocks Mined | 70,000+ |
+| Block Reward | 50 SILVR (47.5 miner + 2.5 treasury) |
 | Algorithm | SHA-256d |
+| Blocks Mined | Growing — check live explorer |
+| Nodes Running | 2 nodes active |
+| Explorer | him-silvr.github.io/SILVR/explorer.html |
 | Twitter | @SILVRprotocol |
+
 
 ---
 
@@ -82,6 +85,7 @@ make
 Step 4 — Create your wallet:
 gcc src/wallet/wallet.c -o silvr_wallet -lssl -lcrypto -lsecp256k1 -Iinclude
 ./silvr_wallet
+
 
 Step 5 — Start mining:
 ./silvrd YOUR_ADDRESS_HERE
