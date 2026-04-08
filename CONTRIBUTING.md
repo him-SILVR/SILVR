@@ -1,73 +1,35 @@
 # Contributing to SILVR
 
-Thank you for your interest in contributing to SILVR.
+SILVR is built in public. Everyone is welcome.
 
-SILVR is a community owned blockchain. 
-No single person controls it.
-Every contribution matters.
+## Ways to contribute
 
----
+1. Run a node — most important thing right now
+2. Report bugs — open an Issue
+3. Improve the code — open a Pull Request
+4. Spread the word — tweet about SILVR
+5. Join Telegram — SILVR Official
 
-## How to Contribute
+## Run a Node
 
-### Report a Bug
-Open an Issue on GitHub.
-Describe what happened and what you expected.
-Include your operating system and compiler version.
+git clone https://github.com/him-SILVR/SILVR.git
+cd SILVR
+make
+./silvrd YOUR_SILVR_ADDRESS
 
-### Suggest a Feature
-Open an Issue with the label enhancement.
-Describe the feature and why it helps SILVR.
-Wait for community discussion before building.
-
-### Submit Code
-1. Fork the repository
-2. Create a new branch for your change
-3. Write clean C code following existing style
-4. Test your changes compile and run correctly
-5. Submit a Pull Request with a clear description
-
----
+DM @SILVRprotocol on Twitter when your node is running.
+We will connect it to the network.
 
 ## Code Style
 
-- Pure C only. No C++.
-- Follow existing naming conventions
-- silvr_ prefix for all public functions
-- Comment every function with what it does
-- No external dependencies beyond:
-  libsecp256k1, libssl, libcrypto
+Pure C only.
+No external dependencies except OpenSSL and libsecp256k1.
+Comment everything clearly.
 
----
+## Contact
 
-## What We Need Help With
+Twitter: @SILVRprotocol
+Telegram: SILVR Official
+GitHub: github.com/him-SILVR/SILVR
 
-- Real TCP networking improvements
-- LevelDB persistent storage integration
-- JSON-RPC 2.0 server implementation
-- Mobile wallet (iOS and Android)
-- Block explorer web interface
-- Mining pool software
-- Exchange integration guides
-- Translations of documentation
-- Security audits and reviews
-
----
-
-## Community
-
-Twitter  : https://twitter.com/SILVRprotocol
-Telegram : SILVR Official
-
----
-
-## Rules
-
-- Be respectful to all contributors
-- No spam or self promotion
-- Technical discussions only in Issues
-- English language preferred
-
----
-
-"2026/01/01 Silver: The People's Chain"
+The People's Chain.
