@@ -138,7 +138,7 @@ SHA-256d Proof of Work — same as Bitcoin.
 - Single node running — DONE
 - Wallet generator — DONE
 - Block explorer live — DONE
-- Real transaction signing — NEXT
+- Real transaction signing — DONE
 - Second node connected — NEXT
 - True mainnet 3 nodes — COMING
 
