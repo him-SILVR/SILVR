@@ -6,17 +6,15 @@ RUN apt-get update && apt-get install -y \
     gcc \
     make \
     libssl-dev \
+    libsecp256k1-dev \
     pkg-config \
-    git \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /silvr
 
 COPY . .
 
-RUN mkdir -p src/core src/wallet src/consensus src/network src/lightning src/dao
-
-RUN gcc -Wall -O2 -Iinclude \
+RUN gcc -O2 -Iinclude \
     src/core/main.c \
     src/core/crypto.c \
     src/wallet/wallet.c \
@@ -25,7 +23,8 @@ RUN gcc -Wall -O2 -Iinclude \
     src/lightning/lightning.c \
     src/dao/dao.c \
     -o silvrd \
-    -lssl -lcrypto -lm \
-    || echo "Build attempted"
+    -lssl -lcrypto -lm -lsecp256k1
+
+EXPOSE 8633
 
 CMD ["./silvrd"]
