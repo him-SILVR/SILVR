@@ -15,6 +15,9 @@ WORKDIR /silvr
 COPY . .
 
 RUN gcc -O2 -Iinclude \
+    -Wno-unused-result \
+    -Wno-unused-variable \
+    -Wno-unused-parameter \
     src/core/main.c \
     src/core/crypto.c \
     src/wallet/wallet.c \
