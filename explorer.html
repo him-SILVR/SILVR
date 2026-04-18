@@ -1,275 +1,122 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SILVR Block Explorer</title>
 <style>
-* { margin:0; padding:0; box-sizing:border-box; }
-body {
-  background:#0a0a0a;
-  color:#c0c0c0;
-  font-family:monospace;
-  padding:20px;
-}
-h1 {
-  color:#c0c0c0;
-  font-size:22px;
-  border-bottom:1px solid #333;
-  padding-bottom:10px;
-  margin-bottom:20px;
-}
-.card {
-  background:#111;
-  border:1px solid #333;
-  border-radius:8px;
-  padding:16px;
-  margin-bottom:16px;
-}
-.label { color:#666; font-size:12px; margin-bottom:4px; }
-.value { color:#c0c0c0; font-size:18px; font-weight:bold; }
-.green { color:#00ff88; }
-.red { color:#ff4444; }
-.grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-.search-box {
-  width:100%;
-  background:#1a1a1a;
-  border:1px solid #444;
-  color:#c0c0c0;
-  padding:12px;
-  font-family:monospace;
-  font-size:13px;
-  border-radius:6px;
-  margin-bottom:8px;
-}
-button {
-  background:#222;
-  color:#c0c0c0;
-  border:1px solid #444;
-  padding:10px 20px;
-  border-radius:6px;
-  font-family:monospace;
-  cursor:pointer;
-  width:100%;
-  margin-bottom:12px;
-}
-.block-item {
-  background:#0f0f0f;
-  border:1px solid #222;
-  border-radius:6px;
-  padding:12px;
-  margin-bottom:8px;
-  font-size:13px;
-}
-.hash { color:#555; font-size:11px; word-break:break-all; }
-.live-dot {
-  display:inline-block;
-  width:8px; height:8px;
-  background:#00ff88;
-  border-radius:50%;
-  margin-right:6px;
-  animation:pulse 1.5s infinite;
-}
-@keyframes pulse {
-  0%,100% { opacity:1; }
-  50% { opacity:0.3; }
-}
-.status-bar {
-  font-size:11px;
-  color:#555;
-  margin-bottom:16px;
-}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a0a; color: #e0e0e0; font-family: monospace; }
+header { background: #111; border-bottom: 1px solid #333; padding: 20px; text-align: center; }
+header h1 { color: #c0c0c0; font-size: 2em; letter-spacing: 4px; }
+header p { color: #888; margin-top: 5px; }
+.stats { display: flex; flex-wrap: wrap; gap: 15px; padding: 20px; justify-content: center; }
+.stat { background: #111; border: 1px solid #333; border-radius: 8px; padding: 20px; min-width: 200px; text-align: center; }
+.stat .label { color: #888; font-size: 0.8em; text-transform: uppercase; }
+.stat .value { color: #c0c0c0; font-size: 1.5em; margin-top: 8px; font-weight: bold; }
+.genesis { background: #111; border: 1px solid #444; border-radius: 8px; margin: 0 20px 20px; padding: 20px; }
+.genesis h2 { color: #c0c0c0; margin-bottom: 15px; }
+.genesis-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #222; }
+.genesis-row:last-child { border-bottom: none; }
+.blocks { padding: 0 20px 40px; }
+.blocks h2 { color: #c0c0c0; margin-bottom: 15px; }
+.block { background: #111; border: 1px solid #222; border-radius: 8px; padding: 15px; margin-bottom: 10px; }
+.block:hover { border-color: #555; }
+.block-header { display: flex; justify-content: space-between; margin-bottom: 10px; }
+.block-num { color: #c0c0c0; font-weight: bold; font-size: 1.1em; }
+.block-time { color: #888; font-size: 0.85em; }
+.block-hash { color: #666; font-size: 0.75em; word-break: break-all; margin-bottom: 8px; }
+.block-details { display: flex; gap: 20px; flex-wrap: wrap; }
+.block-detail { font-size: 0.85em; }
+.block-detail span { color: #888; }
+.live-dot { display: inline-block; width: 8px; height: 8px; background: #4caf50; border-radius: 50%; margin-right: 6px; animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.footer { text-align: center; padding: 20px; color: #444; font-size: 0.8em; }
 </style>
 </head>
 <body>
+<header>
+  <h1>⬡ SILVR EXPLORER</h1>
+  <p><span class="live-dot"></span>Chain ID: 2026 | The People's Chain</p>
+</header>
 
-<h1>⛏ SILVR Block Explorer</h1>
-<div class="status-bar">
-  <span class="live-dot"></span>
-  <span id="live-status">Connecting to node...</span>
-</div>
-
-<div class="card">
-  <div class="label">Search Any SILVR Address</div>
-  <input class="search-box" id="search"
-    placeholder="Enter SILVR address (starts with S...)"
-    type="text">
-  <button onclick="searchAddress()">Search Address</button>
-  <div id="search-result"></div>
-</div>
-
-<div class="grid">
-  <div class="card">
-    <div class="label">Miner Balance</div>
-    <div class="value green" id="balance">Loading...</div>
-    <div class="label">SILVR</div>
+<div class="stats">
+  <div class="stat">
+    <div class="label">Total Blocks</div>
+    <div class="value" id="totalBlocks">—</div>
   </div>
-  <div class="card">
-    <div class="label">Blocks Mined</div>
-    <div class="value green" id="blocks">Loading...</div>
-    <div class="label">Total blocks</div>
+  <div class="stat">
+    <div class="label">Total Mined</div>
+    <div class="value" id="totalMined">—</div>
   </div>
-  <div class="card">
-    <div class="label">Total Supply</div>
-    <div class="value" id="total">Loading...</div>
-    <div class="label">SILVR mined</div>
+  <div class="stat">
+    <div class="label">Block Reward</div>
+    <div class="value">47.5 SILVR</div>
   </div>
-  <div class="card">
-    <div class="label">Treasury</div>
-    <div class="value" id="treasury">Loading...</div>
-    <div class="label">SILVR</div>
+  <div class="stat">
+    <div class="label">Max Supply</div>
+    <div class="value">42,000,000</div>
+  </div>
+  <div class="stat">
+    <div class="label">Algorithm</div>
+    <div class="value">SHA-256d</div>
+  </div>
+  <div class="stat">
+    <div class="label">Chain ID</div>
+    <div class="value">2026</div>
   </div>
 </div>
 
-<div class="card">
-  <div class="label">Miner Address</div>
-  <div style="font-size:11px;word-break:break-all">
-    SWLswgMRtZ8hn2VHxtJ4EJX46C4fKXDWrE
+<div class="genesis">
+  <h2>⬡ Genesis Allocations</h2>
+  <div class="genesis-row">
+    <span>Founder Locked (4 years)</span>
+    <span style="color:#c0c0c0">2,100,000.00 SILVR</span>
+  </div>
+  <div class="genesis-row">
+    <span>Pre-Mainnet Mining</span>
+    <span style="color:#c0c0c0">4,251,915.00 SILVR</span>
+  </div>
+  <div class="genesis-row">
+    <span style="color:#c0c0c0;font-weight:bold">Total Genesis</span>
+    <span style="color:#c0c0c0;font-weight:bold">6,351,915.00 SILVR</span>
+  </div>
+  <div class="genesis-row">
+    <span>Founder Address</span>
+    <span style="color:#888;font-size:0.85em">SWLswgMRtZ8hn2VHxtJ4EJX46C4fKXDWrE</span>
   </div>
 </div>
 
-<div class="card">
-  <div class="label">Last Block Hash</div>
-  <div class="hash" id="lasthash">Loading...</div>
+<div class="blocks">
+  <h2>⬡ Recent Blocks</h2>
+  <div id="blockList">
+    <div class="block">
+      <div class="block-header">
+        <span class="block-num">Block #1</span>
+        <span class="block-time">March 16, 2026 — Genesis</span>
+      </div>
+      <div class="block-hash">0000000000000000000000000000000000000000000000000000000000000000</div>
+      <div class="block-details">
+        <div class="block-detail"><span>Miner: </span>SWLswgMRtZ8hn2VHxtJ4EJX46C4fKXDWrE</div>
+        <div class="block-detail"><span>Reward: </span>47.50 SILVR</div>
+      </div>
+    </div>
+  </div>
 </div>
 
-<div class="card">
-  <div class="label">Recent Blocks
-    <span style="float:right;color:#00ff88" id="last-update"></span>
-  </div>
-  <div id="recent-blocks">Loading...</div>
+<div class="footer">
+  SILVR — The People's Chain | Chain ID 2026 | SHA-256d Proof of Work<br>
+  github.com/him-SILVR/SILVR
 </div>
 
 <script>
-// ── CONFIG ────────────────────────────────────────
-const REPLIT_API = "https://silvr.replit.dev/api/stats";
-const MINER_ADDR = "SWLswgMRtZ8hn2VHxtJ4EJX46C4fKXDWrE";
-const BLOCK_REWARD = 47.5;
-const TREASURY_PER = 2.5;
-
-// Known confirmed baseline from your nodes
-let STATE = {
-  blocks: 67000,
-  balance: 3185350,
-  treasury: 167500,
-  total: 5511762,
-  last_hash: "00002bc62497731b926ffead72c4a26d06022c8412c85d3ef9df77cea824b82b",
-  last_update: new Date(),
-  live: false
+const STATS = {
+  blocks: 1500,
+  mined: 6422915
 };
 
-// ── FETCH FROM REPLIT NODE ────────────────────────
-async function fetchLiveData() {
-  try {
-    const res = await fetch(REPLIT_API, {
-      signal: AbortSignal.timeout(5000)
-    });
-    if (!res.ok) throw new Error("Node offline");
-    const data = await res.json();
-
-    STATE.blocks    = data.blocks    || STATE.blocks;
-    STATE.balance   = data.balance   || STATE.balance;
-    STATE.treasury  = data.treasury  || STATE.treasury;
-    STATE.total     = data.total     || STATE.total;
-    STATE.last_hash = data.last_hash || STATE.last_hash;
-    STATE.live      = true;
-
-    document.getElementById("live-status").textContent =
-      "Live — connected to Replit node";
-    document.getElementById("live-status").className = "green";
-
-  } catch(e) {
-    STATE.live = false;
-    // Estimate from baseline using time
-    const now = new Date();
-    const mins = (now - STATE.last_update) / 60000;
-    const new_blocks = Math.floor(mins / 5);
-    STATE.blocks  += new_blocks;
-    STATE.balance += new_blocks * BLOCK_REWARD;
-    STATE.treasury += new_blocks * TREASURY_PER;
-    STATE.last_update = now;
-
-    document.getElementById("live-status").textContent =
-      "Estimated — node offline (auto-calculating)";
-    document.getElementById("live-status").style.color = "#ffaa00";
-  }
-
-  updateUI();
-}
-
-// ── UPDATE DISPLAY ────────────────────────────────
-function updateUI() {
-  document.getElementById("balance").textContent =
-    STATE.balance.toLocaleString();
-  document.getElementById("blocks").textContent =
-    STATE.blocks.toLocaleString();
-  document.getElementById("total").textContent =
-    (STATE.balance + 2100000).toLocaleString();
-  document.getElementById("treasury").textContent =
-    STATE.treasury.toLocaleString();
-  document.getElementById("lasthash").textContent =
-    STATE.last_hash;
-  document.getElementById("last-update").textContent =
-    "Updated " + new Date().toLocaleTimeString();
-
-  let html = "";
-  for (let i = STATE.blocks; i > STATE.blocks - 5; i--) {
-    html += `<div class='block-item'>
-      <b>Block #${i.toLocaleString()}</b>
-      <div>Reward: 47.5 SILVR | Treasury: 2.5 SILVR</div>
-      <div class='hash'>Miner: SWLswgMRtZ8hn2VH...KXDWrE</div>
-    </div>`;
-  }
-  document.getElementById("recent-blocks").innerHTML = html;
-}
-
-// ── ADDRESS SEARCH ────────────────────────────────
-const KNOWN = {
-  "SWLswgMRtZ8hn2VHxtJ4EJX46C4fKXDWrE": {
-    balance: STATE.balance,
-    blocks: STATE.blocks,
-    label: "Founder / Genesis Miner"
-  }
-};
-
-function searchAddress() {
-  const addr = document.getElementById("search").value.trim();
-  const res  = document.getElementById("search-result");
-
-  if (!addr) {
-    res.innerHTML = "<span style='color:#ff4444'>Please enter an address</span>";
-    return;
-  }
-  if (addr.length < 26 || !addr.startsWith("S")) {
-    res.innerHTML = "<span style='color:#ff4444'>Invalid SILVR address. Must start with S.</span>";
-    return;
-  }
-  if (addr === MINER_ADDR) {
-    res.innerHTML = `
-      <div style='color:#00ff88;margin-bottom:8px'>✅ Founder address</div>
-      <div class='block-item'>
-        <div style='word-break:break-all'><b>${addr}</b></div>
-        <div>Founder / Genesis Miner</div>
-        <div>Balance: <b>${STATE.balance.toLocaleString()} SILVR</b></div>
-        <div>Blocks: ${STATE.blocks.toLocaleString()}</div>
-      </div>`;
-  } else {
-    res.innerHTML = `
-      <div style='color:#00ff88;margin-bottom:8px'>✅ Valid SILVR address</div>
-      <div class='block-item'>
-        <div style='word-break:break-all'><b>${addr}</b></div>
-        <div>Balance: <b>0 SILVR</b> (not yet mined)</div>
-        <div style='margin-top:8px;color:#666'>
-          Start mining: ./silvrd ${addr}
-        </div>
-      </div>`;
-  }
-}
-
-// ── AUTO REFRESH every 30 seconds ─────────────────
-fetchLiveData();
-setInterval(fetchLiveData, 30000);
+document.getElementById('totalBlocks').textContent = STATS.blocks.toLocaleString();
+document.getElementById('totalMined').textContent = STATS.mined.toLocaleString() + ' SILVR';
 </script>
-
 </body>
 </html>
