@@ -6,6 +6,8 @@ cat > /e/GitHub/SILVR/silvrd_v2.c << 'EOF'
 #include <time.h>
 #include <signal.h>
 #include <openssl/sha.h>
+#include <openssl/evp.h>
+#include <openssl/rand.h>
 
 #define SILVR_CHAIN_ID        2026
 #define SILVR_BLOCK_REWARD    5000000000ULL
@@ -14,12 +16,15 @@ cat > /e/GitHub/SILVR/silvrd_v2.c << 'EOF'
 #define MINER_ADDRESS         "SWLswgMRtZ8hn2VHxtJ4EJX46C4fKXDWrE"
 #define BLOCKCHAIN_FILE       "blockchain_v2.dat"
 #define UTXO_FILE             "utxo.dat"
+#define TX_FILE               "mempool.dat"
 #define GENESIS_TOTAL         635191500000000ULL
 #define MAX_ADDRESSES         10000
 #define ADDR_LEN              64
+#define MAX_MEMPOOL           1000
 
 static volatile int running = 1;
 
+/* ── UTXO ── */
 typedef struct {
     char     address[ADDR_LEN];
     uint64_t balance;
@@ -88,19 +93,6 @@ uint64_t utxo_balance(const char *addr) {
     return e ? e->balance : 0;
 }
 
-int utxo_send(const char *from, const char *to,
-              uint64_t amount, uint64_t fee) {
-    utxo_entry_t *s = utxo_find(from);
-    if (!s || s->balance < amount + fee) return -1;
-    s->balance    -= (amount + fee);
-    s->total_sent += (amount + fee);
-    utxo_entry_t *r = utxo_get(to);
-    if (!r) return -2;
-    r->balance        += amount;
-    r->total_received += amount;
-    return 0;
-}
-
 void utxo_print(const char *addr) {
     utxo_entry_t *e = utxo_find(addr);
     if (!e) { printf("[UTXO] Not found: %s\n", addr); return; }
@@ -124,6 +116,112 @@ void utxo_stats(void) {
     printf("========================================\n\n");
 }
 
+/* ── TRANSACTION ── */
+typedef struct {
+    uint8_t  txid[32];
+    char     from[ADDR_LEN];
+    char     to[ADDR_LEN];
+    uint64_t amount;
+    uint64_t fee;
+    uint32_t timestamp;
+    uint64_t nonce;
+    uint8_t  signature[64];
+    uint8_t  valid;
+} silvr_tx_t;
+
+/* Simple transaction signing using SHA256d of tx data as proof */
+void tx_compute_txid(silvr_tx_t *tx) {
+    uint8_t buf[256];
+    size_t  off = 0;
+    memcpy(buf + off, tx->from,      ADDR_LEN); off += ADDR_LEN;
+    memcpy(buf + off, tx->to,        ADDR_LEN); off += ADDR_LEN;
+    memcpy(buf + off, &tx->amount,   8);         off += 8;
+    memcpy(buf + off, &tx->fee,      8);         off += 8;
+    memcpy(buf + off, &tx->timestamp,4);         off += 4;
+    memcpy(buf + off, &tx->nonce,    8);         off += 8;
+    uint8_t tmp[32];
+    SHA256(buf, off, tmp);
+    SHA256(tmp, 32, tx->txid);
+}
+
+void tx_sign(silvr_tx_t *tx) {
+    /* Sign = SHA256d(txid + nonce) stored in signature field */
+    uint8_t buf[40];
+    memcpy(buf,      tx->txid,   32);
+    memcpy(buf + 32, &tx->nonce,  8);
+    uint8_t tmp[32];
+    SHA256(buf, 40, tmp);
+    SHA256(tmp, 32, tx->signature);
+    /* Pad remaining 32 bytes with txid for verification */
+    memcpy(tx->signature + 32, tx->txid, 32);
+    tx->valid = 1;
+}
+
+int tx_verify(silvr_tx_t *tx) {
+    if (!tx->valid) return 0;
+    uint8_t buf[40];
+    memcpy(buf,      tx->txid,   32);
+    memcpy(buf + 32, &tx->nonce,  8);
+    uint8_t tmp[32], expected[32];
+    SHA256(buf, 40, tmp);
+    SHA256(tmp, 32, expected);
+    if (memcmp(expected, tx->signature, 32) != 0) return 0;
+    if (memcmp(tx->txid, tx->signature + 32, 32) != 0) return 0;
+    return 1;
+}
+
+int tx_validate(silvr_tx_t *tx) {
+    if (!tx_verify(tx)) {
+        printf("[TX] Invalid signature\n");
+        return 0;
+    }
+    uint64_t bal = utxo_balance(tx->from);
+    if (bal < tx->amount + tx->fee) {
+        printf("[TX] Insufficient balance. Have %.8f need %.8f\n",
+               (double)bal / 1e8,
+               (double)(tx->amount + tx->fee) / 1e8);
+        return 0;
+    }
+    return 1;
+}
+
+int tx_execute(silvr_tx_t *tx) {
+    if (!tx_validate(tx)) return 0;
+    utxo_entry_t *s = utxo_find(tx->from);
+    if (!s) return 0;
+    s->balance    -= (tx->amount + tx->fee);
+    s->total_sent += (tx->amount + tx->fee);
+    utxo_entry_t *r = utxo_get(tx->to);
+    if (!r) return 0;
+    r->balance        += tx->amount;
+    r->total_received += tx->amount;
+    printf("[TX] Sent %.8f SILVR\n", (double)tx->amount / 1e8);
+    printf("     From : %s\n", tx->from);
+    printf("     To   : %s\n", tx->to);
+    printf("     Fee  : %.8f SILVR\n", (double)tx->fee / 1e8);
+    printf("     TXID : ");
+    for (int i = 0; i < 32; i++) printf("%02x", tx->txid[i]);
+    printf("\n\n");
+    utxo_save();
+    return 1;
+}
+
+silvr_tx_t tx_create(const char *from, const char *to,
+                     uint64_t amount, uint64_t fee) {
+    silvr_tx_t tx;
+    memset(&tx, 0, sizeof(tx));
+    strncpy(tx.from, from, ADDR_LEN - 1);
+    strncpy(tx.to,   to,   ADDR_LEN - 1);
+    tx.amount    = amount;
+    tx.fee       = fee;
+    tx.timestamp = (uint32_t)time(NULL);
+    tx.nonce     = (uint64_t)time(NULL) ^ (uint64_t)rand();
+    tx_compute_txid(&tx);
+    tx_sign(&tx);
+    return tx;
+}
+
+/* ── BLOCK ── */
 typedef struct {
     uint32_t version;
     uint8_t  prev_hash[32];
@@ -160,7 +258,6 @@ uint64_t block_reward(uint64_t height) {
     return r;
 }
 
-/* FIXED: real bit-level difficulty check */
 int check_difficulty(uint8_t *hash, uint32_t bits) {
     for (uint32_t i = 0; i < bits && i < 256; i++) {
         uint32_t byte = i / 8;
@@ -203,6 +300,35 @@ void handle_signal(int sig) {
     running = 0;
 }
 
+/* ── DEMO TX on startup ── */
+void demo_transaction(const char *from) {
+    printf("\n[TX DEMO] Creating test transaction...\n");
+    const char *test_to = "STest1ReceiverAddressDemo000000000";
+    uint64_t amount = 100000000ULL; /* 1.0 SILVR */
+    uint64_t fee    =   1000000ULL; /* 0.01 SILVR */
+
+    if (utxo_balance(from) < amount + fee) {
+        printf("[TX DEMO] Skipped — insufficient balance\n\n");
+        return;
+    }
+
+    silvr_tx_t tx = tx_create(from, test_to, amount, fee);
+
+    printf("[TX DEMO] Transaction created:\n");
+    printf("  From   : %s\n", tx.from);
+    printf("  To     : %s\n", tx.to);
+    printf("  Amount : %.8f SILVR\n", (double)tx.amount / 1e8);
+    printf("  Fee    : %.8f SILVR\n", (double)tx.fee / 1e8);
+    printf("  TXID   : ");
+    for (int i = 0; i < 32; i++) printf("%02x", tx.txid[i]);
+    printf("\n");
+    printf("  Valid  : %s\n\n", tx_verify(&tx) ? "YES" : "NO");
+
+    if (tx_execute(&tx)) {
+        printf("[TX DEMO] Transaction executed successfully!\n\n");
+    }
+}
+
 int main(int argc, char *argv[]) {
     signal(SIGINT,  handle_signal);
     signal(SIGTERM, handle_signal);
@@ -211,7 +337,7 @@ int main(int argc, char *argv[]) {
     if (argc > 1) miner = argv[1];
 
     printf("\n================================================\n");
-    printf("  SILVR Node v2.1 - The People's Chain\n");
+    printf("  SILVR Node v2.2 - The People's Chain\n");
     printf("  Chain ID  : %d\n", SILVR_CHAIN_ID);
     printf("  Miner     : %s\n", miner);
     printf("  Max Supply: 42,000,000 SILVR\n");
@@ -238,6 +364,9 @@ int main(int argc, char *argv[]) {
 
     utxo_print(miner);
 
+    /* Demo transaction on startup */
+    demo_transaction(miner);
+
     silvr_block_header_t block;
     silvr_saved_block_t  saved;
     uint8_t current_hash[32];
@@ -245,10 +374,8 @@ int main(int argc, char *argv[]) {
     printf("Mining...\n\n");
 
     while (running) {
-
-        /* Supply cap check */
         if (total_mined >= SILVR_MAX_SUPPLY) {
-            printf("Max supply reached. Mining complete.\n");
+            printf("Max supply reached.\n");
             break;
         }
 
@@ -271,7 +398,6 @@ int main(int argc, char *argv[]) {
         uint64_t mreward = reward * 95 / 100;
         uint64_t treas   = reward *  5 / 100;
 
-        /* Cap reward at remaining supply */
         if (total_mined + mreward > SILVR_MAX_SUPPLY)
             mreward = SILVR_MAX_SUPPLY - total_mined;
 
@@ -295,11 +421,10 @@ int main(int argc, char *argv[]) {
         printf("  Hash    : ");
         print_hash(current_hash);
         printf("\n");
-        printf("  Miner   : %s\n", miner);
         printf("  Reward  : %.8f SILVR\n", (double)mreward / 1e8);
         printf("  Balance : %.8f SILVR\n",
                (double)utxo_balance(miner) / 1e8);
-        printf("  Supply  : %.8f / 42,000,000 SILVR\n\n",
+        printf("  Supply  : %.8f / 42,000,000\n\n",
                (double)total_mined / 1e8);
 
         height++;
