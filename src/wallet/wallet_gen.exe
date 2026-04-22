@@ -1,0 +1,184 @@
+cat > /e/GitHub/SILVR/wallet_gen.c << 'EOF'
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
+#include <time.h>
+#include <openssl/sha.h>
+#include <openssl/rand.h>
+
+#define ADDR_LEN 64
+
+/* Base58 alphabet — same as Bitcoin */
+static const char *B58 =
+    "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+
+void sha256d(const uint8_t *data, size_t len, uint8_t *out) {
+    uint8_t tmp[32];
+    SHA256(data, len, tmp);
+    SHA256(tmp, 32, out);
+}
+
+/* Simple checksum */
+void checksum4(const uint8_t *data, size_t len, uint8_t *out) {
+    uint8_t h[32];
+    sha256d(data, len, h);
+    memcpy(out, h, 4);
+}
+
+/* Base58Check encode */
+void base58check(const uint8_t *payload, size_t plen,
+                 uint8_t version, char *out) {
+    uint8_t buf[128];
+    buf[0] = version;
+    memcpy(buf + 1, payload, plen);
+    uint8_t chk[4];
+    checksum4(buf, 1 + plen, chk);
+    memcpy(buf + 1 + plen, chk, 4);
+    size_t total = 1 + plen + 4;
+
+    /* Count leading zeros */
+    int zeros = 0;
+    for (size_t i = 0; i < total && buf[i] == 0; i++) zeros++;
+
+    /* Convert to base58 */
+    uint8_t tmp[128] = {0};
+    int     tlen = 0;
+    for (size_t i = 0; i < total; i++) {
+        int carry = buf[i];
+        for (int j = 0; j < tlen; j++) {
+            carry += 256 * tmp[j];
+            tmp[j] = carry % 58;
+            carry /= 58;
+        }
+        while (carry) {
+            tmp[tlen++] = carry % 58;
+            carry /= 58;
+        }
+    }
+
+    int olen = 0;
+    for (int i = 0; i < zeros; i++) out[olen++] = '1';
+    for (int i = tlen - 1; i >= 0; i--) out[olen++] = B58[tmp[i]];
+    out[olen] = '\0';
+}
+
+void generate_wallet(void) {
+    /* Generate 32 random bytes as private key */
+    uint8_t privkey[32];
+    if (RAND_bytes(privkey, 32) != 1) {
+        /* Fallback if RAND_bytes fails */
+        srand((unsigned)time(NULL));
+        for (int i = 0; i < 32; i++)
+            privkey[i] = (uint8_t)(rand() & 0xFF);
+    }
+
+    /* Derive address: SHA256d(privkey) → take 20 bytes → base58check */
+    uint8_t keyhash[32];
+    sha256d(privkey, 32, keyhash);
+
+    /* SILVR version byte 0x3F = address starts with S */
+    char address[64];
+    base58check(keyhash, 20, 0x3F, address);
+
+    /* Print private key as hex */
+    printf("\n");
+    printf("================================================\n");
+    printf("  NEW SILVR WALLET GENERATED\n");
+    printf("================================================\n");
+    printf("  Address     : %s\n", address);
+    printf("  Private Key : ");
+    for (int i = 0; i < 32; i++) printf("%02x", privkey[i]);
+    printf("\n");
+    printf("================================================\n");
+    printf("  !! SAVE YOUR PRIVATE KEY ON PAPER !!\n");
+    printf("  !! NEVER SHARE IT WITH ANYONE     !!\n");
+    printf("  !! LOSING IT MEANS LOSING SILVR   !!\n");
+    printf("================================================\n\n");
+
+    /* Save address to file */
+    FILE *f = fopen("my_wallet.txt", "w");
+    if (f) {
+        fprintf(f, "SILVR WALLET\n");
+        fprintf(f, "Address: %s\n", address);
+        fprintf(f, "Private Key: ");
+        for (int i = 0; i < 32; i++) fprintf(f, "%02x", privkey[i]);
+        fprintf(f, "\n");
+        fprintf(f, "KEEP THIS FILE SECURE AND BACKED UP\n");
+        fclose(f);
+        printf("Wallet saved to my_wallet.txt\n\n");
+    }
+}
+
+void check_balance(const char *address) {
+    /* Read utxo.dat and find balance */
+    FILE *f = fopen("utxo.dat", "rb");
+    if (!f) {
+        printf("No UTXO database found. Run silvrd_v2.exe first.\n");
+        return;
+    }
+
+    typedef struct {
+        char     addr[64];
+        uint64_t balance;
+        uint64_t total_received;
+        uint64_t total_sent;
+        uint64_t block_count;
+    } entry_t;
+
+    typedef struct {
+        entry_t  entries[10000];
+        uint32_t count;
+        uint64_t total_supply;
+        uint64_t last_block;
+    } db_t;
+
+    db_t *db = malloc(sizeof(db_t));
+    if (!db) { fclose(f); return; }
+    fread(db, sizeof(db_t), 1, f);
+    fclose(f);
+
+    int found = 0;
+    for (uint32_t i = 0; i < db->count; i++) {
+        if (strncmp(db->entries[i].addr, address, 63) == 0) {
+            printf("\n========================================\n");
+            printf("  Address : %s\n", address);
+            printf("  Balance : %.8f SILVR\n",
+                   (double)db->entries[i].balance / 1e8);
+            printf("========================================\n\n");
+            found = 1;
+            break;
+        }
+    }
+    if (!found) printf("Address not found in UTXO. Balance: 0 SILVR\n");
+    free(db);
+}
+
+int main(int argc, char *argv[]) {
+    printf("\n");
+    printf("  ███████╗██╗██╗    ██╗   ██╗██████╗ \n");
+    printf("  ██╔════╝██║██║    ██║   ██║██╔══██╗\n");
+    printf("  ███████╗██║██║    ██║   ██║██████╔╝\n");
+    printf("  ╚════██║██║██║    ╚██╗ ██╔╝██╔══██╗\n");
+    printf("  ███████║██║███████╗╚████╔╝ ██║  ██║\n");
+    printf("  ╚══════╝╚═╝╚══════╝ ╚═══╝  ╚═╝  ╚═╝\n");
+    printf("  Wallet Generator v1.0\n\n");
+
+    if (argc < 2) {
+        printf("Usage:\n");
+        printf("  wallet_gen.exe new          — generate new wallet\n");
+        printf("  wallet_gen.exe balance <addr> — check balance\n\n");
+        return 0;
+    }
+
+    if (strcmp(argv[1], "new") == 0) {
+        generate_wallet();
+    } else if (strcmp(argv[1], "balance") == 0 && argc > 2) {
+        check_balance(argv[2]);
+    } else {
+        printf("Unknown command. Use: new | balance <address>\n");
+    }
+
+    return 0;
+}
+EOF
