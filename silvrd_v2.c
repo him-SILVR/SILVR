@@ -1,3 +1,4 @@
+cat > /e/GitHub/SILVR/silvrd_v2.c << 'EOF'
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,6 +10,7 @@
 #define SILVR_CHAIN_ID        2026
 #define SILVR_BLOCK_REWARD    5000000000ULL
 #define SILVR_HALVING         420000
+#define SILVR_MAX_SUPPLY      4200000000000000ULL
 #define MINER_ADDRESS         "SWLswgMRtZ8hn2VHxtJ4EJX46C4fKXDWrE"
 #define BLOCKCHAIN_FILE       "blockchain_v2.dat"
 #define UTXO_FILE             "utxo.dat"
@@ -158,10 +160,13 @@ uint64_t block_reward(uint64_t height) {
     return r;
 }
 
-int check_difficulty(uint8_t *hash, uint32_t diff) {
-    uint32_t z = diff / 8;
-    for (uint32_t i = 0; i < z && i < 32; i++)
-        if (hash[i] != 0) return 0;
+/* FIXED: real bit-level difficulty check */
+int check_difficulty(uint8_t *hash, uint32_t bits) {
+    for (uint32_t i = 0; i < bits && i < 256; i++) {
+        uint32_t byte = i / 8;
+        uint32_t bit  = 7 - (i % 8);
+        if ((hash[byte] >> bit) & 1) return 0;
+    }
     return 1;
 }
 
@@ -226,7 +231,7 @@ int main(int argc, char *argv[]) {
     memset(prev_hash, 0, 32);
     uint64_t height      = 0;
     uint64_t total_mined = GENESIS_TOTAL;
-    uint32_t difficulty  = 4;
+    uint32_t difficulty  = 20;
 
     if (!load_chain(&height, &total_mined, prev_hash, &difficulty))
         printf("[CHAIN] Starting fresh from genesis...\n\n");
@@ -240,6 +245,13 @@ int main(int argc, char *argv[]) {
     printf("Mining...\n\n");
 
     while (running) {
+
+        /* Supply cap check */
+        if (total_mined >= SILVR_MAX_SUPPLY) {
+            printf("Max supply reached. Mining complete.\n");
+            break;
+        }
+
         memset(&block, 0, sizeof(block));
         block.version    = 1;
         block.height     = height;
@@ -258,8 +270,12 @@ int main(int argc, char *argv[]) {
         uint64_t reward  = block_reward(height);
         uint64_t mreward = reward * 95 / 100;
         uint64_t treas   = reward *  5 / 100;
-        total_mined     += mreward;
 
+        /* Cap reward at remaining supply */
+        if (total_mined + mreward > SILVR_MAX_SUPPLY)
+            mreward = SILVR_MAX_SUPPLY - total_mined;
+
+        total_mined += mreward;
         memcpy(prev_hash, current_hash, 32);
 
         utxo_credit(miner, mreward, height);
@@ -283,14 +299,14 @@ int main(int argc, char *argv[]) {
         printf("  Reward  : %.8f SILVR\n", (double)mreward / 1e8);
         printf("  Balance : %.8f SILVR\n",
                (double)utxo_balance(miner) / 1e8);
-        printf("  Supply  : %.8f SILVR\n\n",
+        printf("  Supply  : %.8f / 42,000,000 SILVR\n\n",
                (double)total_mined / 1e8);
 
         height++;
 
         if (height % 2016 == 0) {
             difficulty++;
-            printf(">>> Difficulty -> %u <<<\n\n", difficulty);
+            printf(">>> Difficulty -> %u bits <<<\n\n", difficulty);
         }
 
         if (height % 100 == 0) utxo_stats();
@@ -301,3 +317,4 @@ int main(int argc, char *argv[]) {
     utxo_stats();
     return 0;
 }
+EOF
