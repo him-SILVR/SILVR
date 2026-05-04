@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SILVR Wallet</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0a;color:#c0c0c0;font-family:monospace;min-height:100vh;padding:20px}
+.container{max-width:600px;margin:0 auto}
+header{text-align:center;padding:30px 0 20px}
+header h1{font-size:2.5em;letter-spacing:6px;color:#e0e0e0}
+header p{color:#666;font-size:0.8em;letter-spacing:3px;margin-top:6px}
+.card{background:#111;border:1px solid #222;border-radius:4px;padding:20px;margin-bottom:16px}
+.card h2{font-size:0.75em;letter-spacing:4px;color:#666;text-transform:uppercase;margin-bottom:16px}
+.btn{width:100%;padding:14px;background:#1a1a1a;border:1px solid #333;color:#c0c0c0;font-family:monospace;font-size:0.9em;letter-spacing:2px;cursor:pointer;text-transform:uppercase;transition:all 0.2s}
+.btn:hover{background:#222;border-color:#555;color:#e0e0e0}
+.btn-primary{background:#0f0f0f;border-color:#444;color:#e0e0e0}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:0.7em;letter-spacing:3px;color:#555;text-transform:uppercase;margin-bottom:6px}
+.field input,.field textarea{width:100%;background:#0a0a0a;border:1px solid #222;color:#c0c0c0;font-family:monospace;font-size:0.8em;padding:10px;outline:none}
+.field input:focus,.field textarea:focus{border-color:#444}
+.field textarea{height:80px;resize:none;word-break:break-all}
+.hash{font-size:0.72em;color:#888;word-break:break-all;background:#0a0a0a;padding:10px;border:1px solid #1a1a1a;margin-top:6px;line-height:1.8}
+.row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #1a1a1a;font-size:0.82em}
+.row:last-child{border-bottom:none}
+.row .k{color:#555}
+.row .v{color:#c0c0c0;text-align:right}
+.alert{padding:12px;font-size:0.78em;margin-top:10px;line-height:1.7}
+.alert-warn{background:#1a1200;border:1px solid #332200;color:#aa8800}
+.alert-ok{background:#001a00;border:1px solid #003300;color:#00aa44}
+.alert-err{background:#1a0000;border:1px solid #330000;color:#aa0000}
+#wallet-info{display:none}
+#send-section{display:none}
+.sep{height:1px;background:#1a1a1a;margin:16px 0}
+.tag{display:inline-block;padding:2px 8px;font-size:0.65em;letter-spacing:2px;border:1px solid #333;color:#666;margin-left:8px;vertical-align:middle}
+.copy-btn{background:none;border:1px solid #333;color:#666;font-family:monospace;font-size:0.65em;padding:3px 8px;cursor:pointer;letter-spacing:1px}
+.copy-btn:hover{color:#c0c0c0;border-color:#555}
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1>SILVR</h1>
+  <p>The People's Chain · Chain ID 2026</p>
+</header>
+
+<div class="card">
+  <h2>Your Wallet</h2>
+  <button class="btn btn-primary" onclick="generateWallet()">Generate New Wallet</button>
+  <div id="wallet-info">
+    <div class="sep"></div>
+    <div class="field">
+      <label>Address <span class="tag">SILVR</span> <button class="copy-btn" onclick="copy('addr-out')">COPY</button></label>
+      <div class="hash" id="addr-out">—</div>
+    </div>
+    <div class="field">
+      <label>Private Key <span class="tag">SECRET — NEVER SHARE</span> <button class="copy-btn" onclick="copy('key-out')">COPY</button></label>
+      <div class="hash" id="key-out">—</div>
+    </div>
+    <div class="alert alert-warn">
+      Write your private key on paper immediately. Anyone with your private key owns your SILVR. There is no recovery without it.
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Send SILVR</h2>
+  <div class="field">
+    <label>Your Address</label>
+    <input type="text" id="from-addr" placeholder="Your SILVR address...">
+  </div>
+  <div class="field">
+    <label>Recipient Address</label>
+    <input type="text" id="to-addr" placeholder="Recipient SILVR address...">
+  </div>
+  <div class="field">
+    <label>Amount (SILVR)</label>
+    <input type="number" id="send-amount" placeholder="0.00000000" step="0.00000001">
+  </div>
+  <button class="btn" onclick="buildTx()">Build Transaction</button>
+  <div id="tx-output"></div>
+</div>
+
+<div class="card">
+  <h2>Chain Info</h2>
+  <div class="row"><span class="k">Chain ID</span><span class="v">2026</span></div>
+  <div class="row"><span class="k">Ticker</span><span class="v">SILVR</span></div>
+  <div class="row"><span class="k">Max Supply</span><span class="v">42,000,000 SILVR</span></div>
+  <div class="row"><span class="k">Block Reward</span><span class="v">47.5 SILVR</span></div>
+  <div class="row"><span class="k">Algorithm</span><span class="v">SHA-256d PoW</span></div>
+  <div class="row"><span class="k">Block Time</span><span class="v">5 minutes</span></div>
+  <div class="row"><span class="k">Halving</span><span class="v">Every 420,000 blocks</span></div>
+  <div class="row"><span class="k">Port</span><span class="v">8633</span></div>
+  <div class="row"><span class="k">Genesis</span><span class="v">March 16, 2026</span></div>
+  <div class="row"><span class="k">Explorer</span><span class="v"><a href="explorer.html" style="color:#888">explorer.html</a></span></div>
+  <div class="row"><span class="k">GitHub</span><span class="v"><a href="https://github.com/him-SILVR/SILVR" style="color:#888" target="_blank">him-SILVR/SILVR</a></span></div>
+</div>
+
+<div class="card">
+  <h2>Genesis Allocation</h2>
+  <div class="row"><span class="k">Founder Locked (4yr)</span><span class="v">2,100,000 SILVR</span></div>
+  <div class="row"><span class="k">Pre-Mainnet Mining</span><span class="v">4,251,915 SILVR</span></div>
+  <div class="row"><span class="k">Total Genesis</span><span class="v" style="color:#e0e0e0">6,351,915 SILVR</span></div>
+  <div class="row"><span class="k">Founder Address</span><span class="v" style="font-size:0.75em">SWLswgMRtZ8hn2VHxtJ4EJX46C4fKXDWrE</span></div>
+</div>
+
+<div style="text-align:center;padding:20px 0;color:#333;font-size:0.75em;letter-spacing:2px">
+  SILVR — The People's Chain · github.com/him-SILVR/SILVR
+</div>
+
+</div>
+
+<script>
+async function sha256(data) {
+  const buf = typeof data === 'string'
+    ? new TextEncoder().encode(data)
+    : data;
+  const hash = await crypto.subtle.digest('SHA-256', buf);
+  return new Uint8Array(hash);
+}
+
+async function sha256d(data) {
+  const h1 = await sha256(data);
+  return sha256(h1);
+}
+
+function toHex(bytes) {
+  return Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+function fromHex(hex) {
+  const arr = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < arr.length; i++)
+    arr[i] = parseInt(hex.substr(i*2, 2), 16);
+  return arr;
+}
+
+const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+
+function toBase58(bytes) {
+  let zeros = 0;
+  for (let i = 0; i < bytes.length && bytes[i] === 0; i++) zeros++;
+  const digits = [0];
+  for (let i = 0; i < bytes.length; i++) {
+    let carry = bytes[i];
+    for (let j = 0; j < digits.length; j++) {
+      carry += digits[j] * 256;
+      digits[j] = carry % 58;
+      carry = Math.floor(carry / 58);
+    }
+    while (carry > 0) {
+      digits.push(carry % 58);
+      carry = Math.floor(carry / 58);
+    }
+  }
+  return '1'.repeat(zeros) +
+    digits.reverse().map(d => B58[d]).join('');
+}
+
+async function generateWallet() {
+  const privkey = new Uint8Array(32);
+  crypto.getRandomValues(privkey);
+  const keyhash = await sha256d(privkey);
+  const payload = new Uint8Array(21);
+  payload[0] = 0x3F;
+  payload.set(keyhash.slice(0, 20), 1);
+  const checksum = await sha256d(payload);
+  const full = new Uint8Array(25);
+  full.set(payload);
+  full.set(checksum.slice(0, 4), 21);
+  const address = toBase58(full);
+  document.getElementById('addr-out').textContent = address;
+  document.getElementById('key-out').textContent = toHex(privkey);
+  document.getElementById('wallet-info').style.display = 'block';
+}
+
+async function buildTx() {
+  const from = document.getElementById('from-addr').value.trim();
+  const to   = document.getElementById('to-addr').value.trim();
+  const amt  = parseFloat(document.getElementById('send-amount').value);
+  const out  = document.getElementById('tx-output');
+
+  if (!from || !to || isNaN(amt) || amt <= 0) {
+    out.innerHTML = '<div class="alert alert-err">Fill in all fields with valid values.</div>';
+    return;
+  }
+
+  const amount = Math.round(amt * 1e8);
+  const fee    = 1000000;
+  const nonce  = Date.now();
+  const ts     = Math.floor(Date.now() / 1000);
+
+  const enc = new TextEncoder();
+  const buf = new Uint8Array(enc.encode(from + to + amount + fee + ts + nonce));
+  const txid = await sha256d(buf);
+  const txidHex = toHex(txid);
+
+  out.innerHTML = `
+    <div class="sep"></div>
+    <div class="field">
+      <label>Transaction ID</label>
+      <div class="hash">${txidHex}</div>
+    </div>
+    <div class="row"><span class="k">From</span><span class="v" style="font-size:0.8em;max-width:60%;word-break:break-all">${from}</span></div>
+    <div class="row"><span class="k">To</span><span class="v" style="font-size:0.8em;max-width:60%;word-break:break-all">${to}</span></div>
+    <div class="row"><span class="k">Amount</span><span class="v">${amt.toFixed(8)} SILVR</span></div>
+    <div class="row"><span class="k">Fee</span><span class="v">0.01000000 SILVR</span></div>
+    <div class="alert alert-ok">
+      Transaction built successfully. Broadcast this TXID to the network via your node using silvrd_v2.exe.
+    </div>`;
+}
+
+function copy(id) {
+  const text = document.getElementById(id).textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const el = document.getElementById(id);
+    const orig = el.style.borderColor;
+    el.style.borderColor = '#335533';
+    setTimeout(() => el.style.borderColor = orig, 1000);
+  });
+}
+</script>
+</body>
+</html>
