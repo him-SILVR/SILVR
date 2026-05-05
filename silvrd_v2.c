@@ -1,4 +1,3 @@
-cat > /e/GitHub/SILVR/silvrd_v2.c << 'EOF'
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,13 +6,31 @@ cat > /e/GitHub/SILVR/silvrd_v2.c << 'EOF'
 #include <signal.h>
 #include <openssl/sha.h>
 
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#pragma comment(lib, "ws2_32.lib")
+#define CLOSE_SOCKET closesocket
+#define SOCKET_ERR INVALID_SOCKET
+#else
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#define SOCKET int
+#define CLOSE_SOCKET close
+#define SOCKET_ERR -1
+#endif
+
 #define SILVR_CHAIN_ID        2026
 #define SILVR_BLOCK_REWARD    5000000000ULL
 #define SILVR_HALVING         420000
 #define SILVR_MAX_SUPPLY      4200000000000000ULL
+#define SILVR_PORT            8633
 #define MINER_ADDRESS         "SWLswgMRtZ8hn2VHxtJ4EJX46C4fKXDWrE"
 #define BLOCKCHAIN_FILE       "blockchain_v2.dat"
 #define UTXO_FILE             "utxo.dat"
+#define PEERS_FILE            "peers.dat"
 #define GENESIS_TOTAL         635191500000000ULL
 #define MAX_ADDRESSES         10000
 #define ADDR_LEN              64
@@ -188,8 +205,6 @@ void print_mining_status(uint64_t height, uint32_t diff,
     else
         snprintf(hr_buf, sizeof(hr_buf), "%.0f H/s", hashrate);
 
-    double pct = (double)total / (double)SILVR_MAX_SUPPLY * 100.0;
-
     printf("\r\033[K");
     printf("  Mining block #%-8llu  Difficulty: %u bits  Nonce: %-12llu  %s",
            (unsigned long long)(height + 1),
@@ -228,6 +243,66 @@ void print_block_found(uint64_t height, uint8_t *hash,
     fflush(stdout);
 }
 
+#ifdef _WIN32
+static int net_init(void) {
+    WSADATA wsa;
+    return WSAStartup(MAKEWORD(2,2), &wsa) == 0;
+}
+static void net_cleanup(void) { WSACleanup(); }
+#else
+static int net_init(void) { return 1; }
+static void net_cleanup(void) {}
+#endif
+
+typedef struct {
+    uint8_t  magic[4];
+    uint8_t  type;
+    uint32_t length;
+} p2p_hdr_t;
+
+#define MSG_HELLO      0x01
+#define MSG_GETBLOCKS  0x02
+#define MSG_BLOCK      0x03
+
+typedef struct {
+    uint32_t version;
+    uint64_t height;
+} hello_msg_t;
+
+void broadcast_block(silvr_saved_block_t *blk) {
+    FILE *f = fopen(PEERS_FILE, "r");
+    if (!f) return;
+    
+    char peer_ip[64];
+    while (fscanf(f, "%63s", peer_ip) == 1) {
+        SOCKET sock = socket(AF_INET, SOCK_STREAM, 0);
+        if (sock == (SOCKET)SOCKET_ERR) continue;
+        
+        struct sockaddr_in addr;
+        memset(&addr, 0, sizeof(addr));
+        addr.sin_family = AF_INET;
+        addr.sin_port   = htons(SILVR_PORT);
+        inet_pton(AF_INET, peer_ip, &addr.sin_addr);
+        
+        if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) == 0) {
+            p2p_hdr_t hdr;
+            hdr.magic[0] = 0xD1;
+            hdr.magic[1] = 0xC3;
+            hdr.magic[2] = 0xA0;
+            hdr.magic[3] = 0xB2;
+            hdr.type   = MSG_BLOCK;
+            hdr.length = sizeof(*blk);
+            send(sock, (char*)&hdr, sizeof(hdr), 0);
+            send(sock, (char*)blk, sizeof(*blk), 0);
+            printf("  [P2P] Block #%llu sent to %s\n",
+                   (unsigned long long)(blk->header.height + 1),
+                   peer_ip);
+        }
+        CLOSE_SOCKET(sock);
+    }
+    fclose(f);
+}
+
 int main(int argc, char *argv[]) {
     signal(SIGINT,  handle_signal);
     signal(SIGTERM, handle_signal);
@@ -236,6 +311,7 @@ int main(int argc, char *argv[]) {
     if (argc > 1) miner = argv[1];
 
     print_banner();
+    net_init();
 
     utxo_init();
     if (!utxo_load()) {
@@ -257,7 +333,7 @@ int main(int argc, char *argv[]) {
     printf("  Blocks  : %llu\n", (unsigned long long)height);
     printf("  Status  : %s\n\n",
            resumed ? "Resumed from saved chain" : "Starting fresh chain");
-    printf("  Starting mining...\n\n");
+    printf("  Starting mining with P2P broadcasting...\n\n");
 
     silvr_block_header_t block;
     silvr_saved_block_t  saved;
@@ -320,6 +396,8 @@ int main(int argc, char *argv[]) {
                           block.nonce, difficulty,
                           (time_t)block.timestamp);
 
+        broadcast_block(&saved);
+
         height++;
 
         if (height % 2016 == 0) {
@@ -334,6 +412,6 @@ int main(int argc, char *argv[]) {
            (double)utxo_balance(miner) / 1e8);
     printf("  Total blocks  : %llu\n\n",
            (unsigned long long)height);
+    net_cleanup();
     return 0;
 }
-EOF
