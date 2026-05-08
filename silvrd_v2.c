@@ -9,14 +9,17 @@
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#include <process.h>
 #pragma comment(lib, "ws2_32.lib")
 #define CLOSE_SOCKET closesocket
 #define SOCKET_ERR INVALID_SOCKET
+typedef int socklen_t;
 #else
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <pthread.h>
 #define SOCKET int
 #define CLOSE_SOCKET close
 #define SOCKET_ERR -1
@@ -27,6 +30,7 @@
 #define SILVR_HALVING         420000
 #define SILVR_MAX_SUPPLY      4200000000000000ULL
 #define SILVR_PORT            8633
+#define API_PORT              8080
 #define MINER_ADDRESS         "SWLswgMRtZ8hn2VHxtJ4EJX46C4fKXDWrE"
 #define BLOCKCHAIN_FILE       "blockchain_v2.dat"
 #define UTXO_FILE             "utxo.dat"
@@ -37,6 +41,9 @@
 
 static volatile int running = 1;
 static uint64_t total_hashes = 0;
+static uint64_t current_height = 0;
+static uint64_t current_supply = 0;
+static uint32_t current_difficulty = 20;
 
 typedef struct {
     char     address[ADDR_LEN];
@@ -174,8 +181,6 @@ void handle_signal(int sig) {
     running = 0;
 }
 
-void clear_line(void) { printf("\r\033[K"); }
-
 void print_banner(void) {
     printf("\033[2J\033[H");
     printf("  +---------------------------------------------------------+\n");
@@ -264,11 +269,6 @@ typedef struct {
 #define MSG_GETBLOCKS  0x02
 #define MSG_BLOCK      0x03
 
-typedef struct {
-    uint32_t version;
-    uint64_t height;
-} hello_msg_t;
-
 void broadcast_block(silvr_saved_block_t *blk) {
     FILE *f = fopen(PEERS_FILE, "r");
     if (!f) return;
@@ -303,6 +303,76 @@ void broadcast_block(silvr_saved_block_t *blk) {
     fclose(f);
 }
 
+#ifdef _WIN32
+void api_server_thread(void *arg) {
+#else
+void *api_server_thread(void *arg) {
+#endif
+    (void)arg;
+    SOCKET srv = socket(AF_INET, SOCK_STREAM, 0);
+    if (srv == (SOCKET)SOCKET_ERR) {
+#ifdef _WIN32
+        return;
+#else
+        return NULL;
+#endif
+    }
+
+    int opt = 1;
+    setsockopt(srv, SOL_SOCKET, SO_REUSEADDR, (char*)&opt, sizeof(opt));
+
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family      = AF_INET;
+    addr.sin_addr.s_addr = INADDR_ANY;
+    addr.sin_port        = htons(API_PORT);
+
+    if (bind(srv, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+        CLOSE_SOCKET(srv);
+#ifdef _WIN32
+        return;
+#else
+        return NULL;
+#endif
+    }
+
+    listen(srv, 5);
+    printf("  [API] Explorer API live on port %d\n", API_PORT);
+
+    while (running) {
+        struct sockaddr_in client_addr;
+        socklen_t clen = sizeof(client_addr);
+        SOCKET client = accept(srv, (struct sockaddr*)&client_addr, &clen);
+        if (client == (SOCKET)SOCKET_ERR) continue;
+
+        char response[2048];
+        int len = snprintf(response, sizeof(response),
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Type: application/json\r\n"
+            "Access-Control-Allow-Origin: *\r\n"
+            "\r\n"
+            "{"
+            "\"height\":%llu,"
+            "\"supply\":%.8f,"
+            "\"difficulty\":%u,"
+            "\"max_supply\":42000000"
+            "}",
+            (unsigned long long)current_height,
+            (double)current_supply / 1e8,
+            current_difficulty
+        );
+        send(client, response, len, 0);
+        CLOSE_SOCKET(client);
+    }
+
+    CLOSE_SOCKET(srv);
+#ifdef _WIN32
+    return;
+#else
+    return NULL;
+#endif
+}
+
 int main(int argc, char *argv[]) {
     signal(SIGINT,  handle_signal);
     signal(SIGTERM, handle_signal);
@@ -326,6 +396,9 @@ int main(int argc, char *argv[]) {
     uint32_t difficulty  = 20;
 
     int resumed = load_chain(&height, &total_mined, prev_hash, &difficulty);
+    current_height = height;
+    current_supply = total_mined;
+    current_difficulty = difficulty;
 
     printf("  Miner   : %s\n", miner);
     printf("  Balance : %.8f SILVR\n",
@@ -333,6 +406,14 @@ int main(int argc, char *argv[]) {
     printf("  Blocks  : %llu\n", (unsigned long long)height);
     printf("  Status  : %s\n\n",
            resumed ? "Resumed from saved chain" : "Starting fresh chain");
+
+#ifdef _WIN32
+    _beginthread(api_server_thread, 0, NULL);
+#else
+    pthread_t api_thread;
+    pthread_create(&api_thread, NULL, api_server_thread, NULL);
+#endif
+
     printf("  Starting mining with P2P broadcasting...\n\n");
 
     silvr_block_header_t block;
@@ -399,9 +480,12 @@ int main(int argc, char *argv[]) {
         broadcast_block(&saved);
 
         height++;
+        current_height = height;
+        current_supply = total_mined;
 
         if (height % 2016 == 0) {
             difficulty++;
+            current_difficulty = difficulty;
             printf("  >>> Difficulty adjusted to %u bits <<<\n\n",
                    difficulty);
         }
