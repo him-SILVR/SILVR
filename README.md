@@ -1,157 +1,124 @@
-# SILVR — Silver Protocol
+# SILVR Protocol — v3.0
 
-> "2026/01/01 Silver: The People's Chain"
+> **The People's Chain** | Chain ID: 2026 | Ticker: SILVR | SHA-256d PoW
 
-## Current Status — Pre-Mainnet
+---
 
-Single node mining. Blocks are real. Chain is real.
-True mainnet requires 3 nodes and transaction signing.
-We are building in public. No lies.
+## What's New in v3.0
 
-| Detail | Value |
-|--------|-------|
-| Genesis Block | March 16, 2026 |
+SILVR v3.0 is a complete cryptographic overhaul from the ground up.
+
+| Feature | v2.4 | v3.0 |
+|---|---|---|
+| Transaction signing | Fake hash | Real ECDSA secp256k1 |
+| Address derivation | SHA256d(privkey) | RIPEMD160(SHA256(pubkey)) |
+| Balance model | Account balances | True UTXO set |
+| Double-spend protection | None | Full UTXO validation |
+| P2P block sync | Empty handler | Full GETBLOCKS/INV/GETDATA/BLOCK |
+| Merkle root | Not computed | Computed and validated in every block |
+| File writes | Direct overwrite | Atomic fsync + rename |
+| Peer protection | None | Rate limiting + ban score system |
+| Quantum readiness | None | Versioned sig_version field, PQ migration path designed |
+
+---
+
+## Chain Parameters
+
+| Parameter | Value |
+|---|---|
 | Chain ID | 2026 |
 | Ticker | SILVR |
 | Max Supply | 42,000,000 SILVR |
 | Block Reward | 50 SILVR (47.5 miner + 2.5 treasury) |
-| Algorithm | SHA-256d |
-| Blocks Mined | Growing — check live explorer |
-| Nodes Running | 2 nodes active |
-| Explorer | him-silvr.github.io/SILVR/explorer.html |
-| Twitter | @SILVRprotocol |
-
-
----
-
-## Mine SILVR on Windows (Easiest Way — WSL)
-
-Step 1 — Enable WSL
-Press Windows key on your keyboard
-Type: Turn Windows features on or off
-Scroll down and tick: Windows Subsystem for Linux
-Click OK and restart your computer
-
-Step 2 — Install Ubuntu
-Open Microsoft Store
-Search: Ubuntu
-Install Ubuntu 22.04
-
-Step 3 — Open Ubuntu terminal
-Press Windows key
-Type: Ubuntu
-Click Open
-
-Step 4 — Install dependencies
-Paste this and press Enter:
-sudo apt install gcc libssl-dev libsecp256k1-dev make git -y
-
-Step 5 — Download SILVR
-git clone https://github.com/him-SILVR/SILVR.git
-cd SILVR
-
-Step 6 — Build SILVR
-make
-
-Step 7 — Create your wallet
-gcc src/wallet/wallet.c -o silvr_wallet -lssl -lcrypto -lsecp256k1 -Iinclude
-./silvr_wallet
-
-You will see your SILVR Address and Private Key.
-SAVE YOUR PRIVATE KEY — write it on paper. Never share it.
-
-Step 8 — Start mining
-./silvrd YOUR_ADDRESS_HERE
-
-Example:
-./silvrd SWLswgMRtZ8hn2VHxtJ4EJX46C4fKXDWrE
-
-You earn 47.5 SILVR every 5 minutes automatically.
+| Block Time | 5 minutes |
+| Halving Interval | Every 420,000 blocks |
+| PoW Algorithm | SHA-256d |
+| Port | 8633 |
+| Genesis Date | March 16, 2026 |
+| Genesis Message | 2026/01/01 Silver: The People's Chain |
 
 ---
 
-## Mine SILVR on Linux
+## Source Files
 
-Step 1 — Install dependencies:
-sudo apt install gcc libssl-dev libsecp256k1-dev make git -y
-
-Step 2 — Download SILVR:
-git clone https://github.com/him-SILVR/SILVR.git
-cd SILVR
-
-Step 3 — Build:
-make
-
-Step 4 — Create your wallet:
-gcc src/wallet/wallet.c -o silvr_wallet -lssl -lcrypto -lsecp256k1 -Iinclude
-./silvr_wallet
-
-
-Step 5 — Start mining:
-./silvrd YOUR_ADDRESS_HERE
+| File | Purpose |
+|---|---|
+| `crypto_abstraction.h` | All cryptography — ECDSA signing, address derivation, key generation, PQ migration path |
+| `silvr_utxo.h` | True UTXO set — double-spend prevention, atomic persistence, coinbase builder |
+| `silvr_p2p.h` | P2P networking — full block sync, handshake with nonce challenge, rate limiting |
+| `silvrd_v3.c` | Main node — mining loop, chain persistence, peer connection |
+| `silvr_migrate.c` | Migration tool — imports v2.4 balance into v3 UTXO set |
 
 ---
 
-## Mine SILVR on Windows (Alternative — MSYS2)
+## Build Instructions
 
-Step 1 — Download MSYS2 from https://www.msys2.org
-Step 2 — Open MSYS2 terminal
-Step 3 — Install tools:
-pacman -S mingw-w64-x86_64-gcc mingw-w64-x86_64-make
+### Requirements
+- Windows MSYS2 MinGW64
+- gcc 15.2.0
+- libsecp256k1 (built from source)
+- OpenSSL 3.x
 
-Step 4 — Download and build:
-git clone https://github.com/him-SILVR/SILVR.git
-cd SILVR
-make
+### Install Dependencies
+```bash
+pacman -Syu
+pacman -S mingw-w64-x86_64-gcc mingw-w64-x86_64-openssl mingw-w64-x86_64-autotools git
+git clone https://github.com/bitcoin-core/secp256k1.git
+cd secp256k1 && ./autogen.sh && ./configure --prefix=/mingw64 --enable-module-recovery && make && make install
+```
 
-Step 5 — Start mining:
-./silvrd.exe YOUR_ADDRESS_HERE
+### Build Node
+```bash
+gcc -std=c99 -O2 silvrd_v3.c -I/mingw64/include -L/mingw64/lib -lsecp256k1 -lssl -lcrypto -lws2_32 -o silvrd_v3.exe
+```
 
----
+### Run Node
+```bash
+./silvrd_v3.exe
+```
 
-## Check Your Balance
-
-Open this link on any device — phone, laptop, anywhere:
-him-silvr.github.io/SILVR/explorer.html
-
-Type your SILVR address in the search box.
-
----
-
-## What is SILVR
-
-Custom Layer-1 blockchain built in C from scratch.
-Not a fork. Not a copy.
-No ICO. No presale. No VC.
-
-42,000,000 maximum supply forever.
-SHA-256d Proof of Work — same as Bitcoin.
-47.5 SILVR reward per block.
-5 minute block time.
+### Connect to Peer
+```bash
+./silvrd_v3.exe <peer_ip>
+```
 
 ---
 
-## Roadmap
+## Cryptographic Architecture
 
-- Genesis block mined March 16 2026 — DONE
-- Code public on GitHub — DONE
-- Single node running — DONE
-- Wallet generator — DONE
-- Block explorer live — DONE
-- Real transaction signing — DONE
-- Second node connected — NEXT
-- True mainnet 3 nodes — COMING
+### Address Derivation (Bitcoin-standard)
+```
+privkey (32 bytes, random)
+    → secp256k1 pubkey (33 bytes compressed)
+    → SHA256(pubkey)
+    → RIPEMD160(SHA256(pubkey))  [20 bytes = pubkey hash]
+    → version(0x3F) || pubkey_hash || SHA256d(version||pubkey_hash)[0..3]
+    → Base58Check encode
+    → Address starting with 'S'
+```
+
+### Quantum Migration Path
+- Current: `sig_version=0` ECDSA compact, `sig_version=1` ECDSA DER
+- Future: `sig_version=2` CRYSTALS-Dilithium2 (NIST PQC standard)
+- Activation: height-based soft fork at block 1,000,000
+- No chain split — old ECDSA outputs remain spendable
 
 ---
 
-## Community
+## Founder Allocation
 
-Twitter: https://twitter.com/SILVRprotocol
-Telegram: SILVR Official
-GitHub: https://github.com/him-SILVR/SILVR
+- Address: `SWLswgMRtZ8hn2VHxtJ4EJX46C4fKXDWrE`
+- Allocation: 2,100,000 SILVR (5% of max supply)
+- Lock period: 4 years from genesis
+- Mined blocks as of v3 launch: 46,913
 
 ---
 
-## License
+## Links
 
-MIT — Open source forever
+- Twitter: [@SILVRprotocol](https://twitter.com/SILVRprotocol)
+- GitHub: [him-SILVR/SILVR](https://github.com/him-SILVR/SILVR)
+
+---
+
+*Built from scratch in C by one person. No VC funding. No pre-mine beyond founder allocation. The People's Chain.*
