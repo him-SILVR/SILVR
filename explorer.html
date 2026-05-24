@@ -3,120 +3,618 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SILVR Block Explorer</title>
+<title>SILVR Protocol — Block Explorer</title>
 <style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { background: #0a0a0a; color: #e0e0e0; font-family: monospace; }
-header { background: #111; border-bottom: 1px solid #333; padding: 20px; text-align: center; }
-header h1 { color: #c0c0c0; font-size: 2em; letter-spacing: 4px; }
-header p { color: #888; margin-top: 5px; }
-.stats { display: flex; flex-wrap: wrap; gap: 15px; padding: 20px; justify-content: center; }
-.stat { background: #111; border: 1px solid #333; border-radius: 8px; padding: 20px; min-width: 200px; text-align: center; }
-.stat .label { color: #888; font-size: 0.8em; text-transform: uppercase; }
-.stat .value { color: #c0c0c0; font-size: 1.5em; margin-top: 8px; font-weight: bold; }
-.genesis { background: #111; border: 1px solid #444; border-radius: 8px; margin: 0 20px 20px; padding: 20px; }
-.genesis h2 { color: #c0c0c0; margin-bottom: 15px; }
-.genesis-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #222; }
-.genesis-row:last-child { border-bottom: none; }
-.blocks { padding: 0 20px 40px; }
-.blocks h2 { color: #c0c0c0; margin-bottom: 15px; }
-.block { background: #111; border: 1px solid #222; border-radius: 8px; padding: 15px; margin-bottom: 10px; }
-.block:hover { border-color: #555; }
-.block-header { display: flex; justify-content: space-between; margin-bottom: 10px; }
-.block-num { color: #c0c0c0; font-weight: bold; font-size: 1.1em; }
-.block-time { color: #888; font-size: 0.85em; }
-.block-hash { color: #666; font-size: 0.75em; word-break: break-all; margin-bottom: 8px; }
-.block-details { display: flex; gap: 20px; flex-wrap: wrap; }
-.block-detail { font-size: 0.85em; }
-.block-detail span { color: #888; }
-.live-dot { display: inline-block; width: 8px; height: 8px; background: #4caf50; border-radius: 50%; margin-right: 6px; animation: pulse 2s infinite; }
-@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
-.footer { text-align: center; padding: 20px; color: #444; font-size: 0.8em; }
+  :root {
+    --silver: #C0C0C0;
+    --silver-bright: #E8E8E8;
+    --silver-dim: #808080;
+    --bg: #0a0a0f;
+    --bg2: #111118;
+    --bg3: #1a1a24;
+    --accent: #9b9bff;
+    --green: #00ff88;
+    --red: #ff4466;
+    --border: #2a2a3a;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg);
+    color: var(--silver-bright);
+    font-family: 'Courier New', monospace;
+    min-height: 100vh;
+  }
+
+  /* HEADER */
+  header {
+    background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 50%, #0a0a0f 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 20px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .logo-icon {
+    width: 40px; height: 40px;
+    background: linear-gradient(135deg, var(--silver), var(--accent));
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: bold; font-size: 18px; color: #000;
+  }
+  .logo-text { font-size: 22px; font-weight: bold; color: var(--silver-bright); }
+  .logo-sub  { font-size: 11px; color: var(--silver-dim); letter-spacing: 3px; }
+
+  /* LIVE TICKER */
+  .ticker {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 12px;
+    color: var(--green);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .ticker-dot {
+    width: 8px; height: 8px;
+    background: var(--green);
+    border-radius: 50%;
+    animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity:1; transform:scale(1); }
+    50%      { opacity:0.4; transform:scale(1.3); }
+  }
+
+  /* MAIN LAYOUT */
+  .container { max-width: 1200px; margin: 0 auto; padding: 30px 20px; }
+
+  /* STATS GRID */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 30px;
+  }
+  .stat-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    transition: border-color 0.3s;
+  }
+  .stat-card:hover { border-color: var(--accent); }
+  .stat-label {
+    font-size: 11px;
+    color: var(--silver-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .stat-value {
+    font-size: 24px;
+    font-weight: bold;
+    color: var(--silver-bright);
+  }
+  .stat-value.green { color: var(--green); }
+  .stat-value.accent { color: var(--accent); }
+
+  /* SUPPLY BAR */
+  .supply-bar-wrap {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 30px;
+  }
+  .supply-bar-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--silver-dim);
+    margin-bottom: 10px;
+  }
+  .supply-bar-track {
+    height: 10px;
+    background: var(--bg3);
+    border-radius: 5px;
+    overflow: hidden;
+  }
+  .supply-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--green));
+    border-radius: 5px;
+    transition: width 1s ease;
+  }
+
+  /* SEARCH */
+  .search-wrap {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 30px;
+  }
+  .search-title {
+    font-size: 13px;
+    color: var(--silver-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .search-row {
+    display: flex;
+    gap: 10px;
+  }
+  .search-input {
+    flex: 1;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--silver-bright);
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    outline: none;
+  }
+  .search-input:focus { border-color: var(--accent); }
+  .search-btn {
+    background: linear-gradient(135deg, var(--accent), #6666dd);
+    border: none;
+    border-radius: 8px;
+    padding: 10px 20px;
+    color: white;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .search-btn:hover { opacity: 0.85; }
+  .search-result {
+    margin-top: 14px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    font-size: 12px;
+    display: none;
+    word-break: break-all;
+    line-height: 1.8;
+  }
+  .search-result.show { display: block; }
+  .result-row { display: flex; gap: 10px; border-bottom: 1px solid var(--border); padding: 6px 0; }
+  .result-row:last-child { border-bottom: none; }
+  .result-key { color: var(--silver-dim); min-width: 140px; }
+  .result-val { color: var(--silver-bright); }
+
+  /* SECTIONS */
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  .section-title {
+    font-size: 14px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--silver-dim);
+  }
+  .section-badge {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 11px;
+    color: var(--accent);
+  }
+
+  /* BLOCKS TABLE */
+  .blocks-wrap {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 30px;
+  }
+  .blocks-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .blocks-table th {
+    background: var(--bg3);
+    padding: 12px 16px;
+    text-align: left;
+    color: var(--silver-dim);
+    letter-spacing: 2px;
+    font-size: 10px;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+  .blocks-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    color: var(--silver-bright);
+  }
+  .blocks-table tr:last-child td { border-bottom: none; }
+  .blocks-table tr:hover td { background: var(--bg3); }
+  .hash-short {
+    color: var(--accent);
+    cursor: pointer;
+    font-family: 'Courier New', monospace;
+  }
+  .hash-short:hover { text-decoration: underline; }
+  .reward-badge {
+    background: rgba(0,255,136,0.1);
+    color: var(--green);
+    border: 1px solid rgba(0,255,136,0.3);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 11px;
+  }
+  .new-block {
+    animation: flash 1s ease;
+  }
+  @keyframes flash {
+    0%   { background: rgba(155,155,255,0.2); }
+    100% { background: transparent; }
+  }
+
+  /* ADDRESS BALANCE */
+  .balance-wrap {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 30px;
+  }
+
+  /* STATUS INDICATORS */
+  .status-online {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--green);
+    font-size: 12px;
+  }
+  .dot-green {
+    width: 8px; height: 8px;
+    background: var(--green);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+
+  /* FOOTER */
+  footer {
+    text-align: center;
+    padding: 30px;
+    color: var(--silver-dim);
+    font-size: 11px;
+    letter-spacing: 2px;
+    border-top: 1px solid var(--border);
+  }
+
+  .loading { color: var(--silver-dim); font-size: 12px; }
+  .error   { color: var(--red);        font-size: 12px; }
 </style>
 </head>
 <body>
+
+<!-- HEADER -->
 <header>
-  <h1>⬡ SILVR EXPLORER</h1>
-  <p><span class="live-dot"></span>Chain ID: 2026 | The People's Chain</p>
-</header>
-
-<div class="stats">
-  <div class="stat">
-    <div class="label">Total Blocks</div>
-    <div class="value" id="totalBlocks">—</div>
-  </div>
-  <div class="stat">
-    <div class="label">Total Mined</div>
-    <div class="value" id="totalMined">—</div>
-  </div>
-  <div class="stat">
-    <div class="label">Block Reward</div>
-    <div class="value">47.5 SILVR</div>
-  </div>
-  <div class="stat">
-    <div class="label">Max Supply</div>
-    <div class="value">42,000,000</div>
-  </div>
-  <div class="stat">
-    <div class="label">Algorithm</div>
-    <div class="value">SHA-256d</div>
-  </div>
-  <div class="stat">
-    <div class="label">Chain ID</div>
-    <div class="value">2026</div>
-  </div>
-</div>
-
-<div class="genesis">
-  <h2>⬡ Genesis Allocations</h2>
-  <div class="genesis-row">
-    <span>Founder Locked (4 years)</span>
-    <span style="color:#c0c0c0">2,100,000.00 SILVR</span>
-  </div>
-  <div class="genesis-row">
-    <span>Pre-Mainnet Mining</span>
-    <span style="color:#c0c0c0">4,251,915.00 SILVR</span>
-  </div>
-  <div class="genesis-row">
-    <span style="color:#c0c0c0;font-weight:bold">Total Genesis</span>
-    <span style="color:#c0c0c0;font-weight:bold">6,351,915.00 SILVR</span>
-  </div>
-  <div class="genesis-row">
-    <span>Founder Address</span>
-    <span style="color:#888;font-size:0.85em">SWLswgMRtZ8hn2VHxtJ4EJX46C4fKXDWrE</span>
-  </div>
-</div>
-
-<div class="blocks">
-  <h2>⬡ Recent Blocks</h2>
-  <div id="blockList">
-    <div class="block">
-      <div class="block-header">
-        <span class="block-num">Block #1</span>
-        <span class="block-time">March 16, 2026 — Genesis</span>
-      </div>
-      <div class="block-hash">0000000000000000000000000000000000000000000000000000000000000000</div>
-      <div class="block-details">
-        <div class="block-detail"><span>Miner: </span>SWLswgMRtZ8hn2VHxtJ4EJX46C4fKXDWrE</div>
-        <div class="block-detail"><span>Reward: </span>47.50 SILVR</div>
-      </div>
+  <div class="logo">
+    <div class="logo-icon">S</div>
+    <div>
+      <div class="logo-text">SILVR</div>
+      <div class="logo-sub">BLOCK EXPLORER</div>
     </div>
   </div>
+  <div class="ticker">
+    <div class="ticker-dot"></div>
+    <span id="ticker-text">Connecting...</span>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- STATS -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Chain Height</div>
+      <div class="stat-value accent" id="stat-height">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Supply</div>
+      <div class="stat-value green" id="stat-supply">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Miner Balance</div>
+      <div class="stat-value" id="stat-balance">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Blocks / Hour</div>
+      <div class="stat-value accent" id="stat-bph">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Difficulty</div>
+      <div class="stat-value" id="stat-diff">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Peers</div>
+      <div class="stat-value" id="stat-peers">—</div>
+    </div>
+  </div>
+
+  <!-- SUPPLY BAR -->
+  <div class="supply-bar-wrap">
+    <div class="supply-bar-label">
+      <span>Total Supply</span>
+      <span id="supply-pct">0%</span>
+    </div>
+    <div class="supply-bar-track">
+      <div class="supply-bar-fill" id="supply-bar" style="width:0%"></div>
+    </div>
+    <div class="supply-bar-label" style="margin-top:8px; margin-bottom:0">
+      <span id="supply-mined">0 SILVR mined</span>
+      <span>42,000,000 SILVR max</span>
+    </div>
+  </div>
+
+  <!-- SEARCH -->
+  <div class="search-wrap">
+    <div class="search-title">Search</div>
+    <div style="display:flex; gap:10px; margin-bottom:10px; flex-wrap:wrap;">
+      <label style="font-size:12px; color:var(--silver-dim);">
+        <input type="radio" name="stype" value="tx" checked> Transaction ID
+      </label>
+      <label style="font-size:12px; color:var(--silver-dim);">
+        <input type="radio" name="stype" value="addr"> Address Balance
+      </label>
+      <label style="font-size:12px; color:var(--silver-dim);">
+        <input type="radio" name="stype" value="block"> Block Height
+      </label>
+    </div>
+    <div class="search-row">
+      <input class="search-input" id="search-input"
+             placeholder="Enter TXID, address, or block height...">
+      <button class="search-btn" onclick="doSearch()">Search</button>
+    </div>
+    <div class="search-result" id="search-result"></div>
+  </div>
+
+  <!-- LATEST BLOCKS -->
+  <div class="section-header">
+    <div class="section-title">Latest Blocks</div>
+    <div class="section-badge" id="block-count">Loading...</div>
+  </div>
+  <div class="blocks-wrap">
+    <table class="blocks-table">
+      <thead>
+        <tr>
+          <th>Height</th>
+          <th>Hash</th>
+          <th>Time</th>
+          <th>Nonce</th>
+          <th>TXs</th>
+          <th>Reward</th>
+        </tr>
+      </thead>
+      <tbody id="blocks-body">
+        <tr><td colspan="6" class="loading" style="padding:20px">
+          Loading blocks...
+        </td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- MINER ADDRESS -->
+  <div class="balance-wrap">
+    <div class="search-title">Founder / Miner Address</div>
+    <div style="font-size:13px; color:var(--accent); margin:8px 0; word-break:break-all;"
+         id="miner-addr">—</div>
+    <div style="font-size:20px; font-weight:bold; color:var(--green);"
+         id="miner-bal">—</div>
+    <div style="font-size:11px; color:var(--silver-dim); margin-top:4px;">
+      SILVR balance
+    </div>
+  </div>
+
 </div>
 
-<div class="footer">
-  SILVR — The People's Chain | Chain ID 2026 | SHA-256d Proof of Work<br>
-  github.com/him-SILVR/SILVR
-</div>
+<!-- FOOTER -->
+<footer>
+  SILVR PROTOCOL &nbsp;|&nbsp; CHAIN ID 2026 &nbsp;|&nbsp;
+  SHA-256d PoW &nbsp;|&nbsp; 42,000,000 MAX SUPPLY &nbsp;|&nbsp;
+  THE PEOPLE'S CHAIN
+</footer>
 
 <script>
-const STATS = {
-  blocks: 1500,
-  mined: 6422915
-};
+const API = 'https://runt-unluckily-overcast.ngrok-free.dev';
+const HEADERS = { 'ngrok-skip-browser-warning': 'true' };
 
-document.getElementById('totalBlocks').textContent = STATS.blocks.toLocaleString();
-document.getElementById('totalMined').textContent = STATS.mined.toLocaleString() + ' SILVR';
+let lastHeight = -1;
+
+/* ── Fetch helpers ── */
+async function apiFetch(path) {
+  const r = await fetch(API + path, { headers: HEADERS });
+  return r.json();
+}
+
+/* ── Format helpers ── */
+function fmtTime(ts) {
+  const d = new Date(ts * 1000);
+  return d.toLocaleTimeString();
+}
+function fmtHash(h) {
+  return h ? h.substring(0, 16) + '...' : '—';
+}
+function fmtNum(n) {
+  return Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
+/* ── Update stats ── */
+async function updateStatus() {
+  try {
+    const s = await apiFetch('/status');
+    document.getElementById('stat-height').textContent  = fmtNum(s.height);
+    document.getElementById('stat-supply').textContent  = fmtNum(s.total_supply) + ' SILVR';
+    document.getElementById('stat-balance').textContent = fmtNum(s.miner_balance) + ' SILVR';
+    document.getElementById('stat-bph').textContent     = s.blocks_per_hour.toFixed(1);
+    document.getElementById('stat-diff').textContent    = s.difficulty + ' bits';
+    document.getElementById('stat-peers').textContent   = s.peers;
+    document.getElementById('miner-addr').textContent   = s.miner_address;
+    document.getElementById('miner-bal').textContent    = fmtNum(s.miner_balance) + ' SILVR';
+
+    /* Supply bar */
+    const pct = (s.total_supply / s.max_supply * 100).toFixed(4);
+    document.getElementById('supply-bar').style.width  = pct + '%';
+    document.getElementById('supply-pct').textContent  = pct + '%';
+    document.getElementById('supply-mined').textContent =
+      fmtNum(s.total_supply) + ' SILVR mined';
+
+    /* Ticker */
+    const isNew = s.height !== lastHeight;
+    if (isNew && lastHeight !== -1) {
+      document.getElementById('ticker-text').textContent =
+        '⬡ NEW BLOCK #' + s.height + ' — ' + fmtNum(s.miner_balance) + ' SILVR';
+    } else {
+      document.getElementById('ticker-text').textContent =
+        '⬡ HEIGHT ' + s.height + '  |  ' + fmtNum(s.total_supply) + ' SILVR mined';
+    }
+    lastHeight = s.height;
+  } catch(e) {
+    document.getElementById('ticker-text').textContent = '⚠ Node offline';
+  }
+}
+
+/* ── Update blocks ── */
+async function updateBlocks() {
+  try {
+    const blocks = await apiFetch('/blocks');
+    const tbody  = document.getElementById('blocks-body');
+    document.getElementById('block-count').textContent =
+      'Last ' + blocks.length + ' blocks';
+
+    tbody.innerHTML = '';
+    blocks.forEach((b, idx) => {
+      const tr = document.createElement('tr');
+      if (idx === 0) tr.classList.add('new-block');
+      tr.innerHTML = `
+        <td style="color:var(--accent); font-weight:bold">#${b.height}</td>
+        <td><span class="hash-short" onclick="searchHash('${b.hash}')">${fmtHash(b.hash)}</span></td>
+        <td style="color:var(--silver-dim)">${fmtTime(b.timestamp)}</td>
+        <td style="color:var(--silver-dim)">${b.nonce.toLocaleString()}</td>
+        <td>${b.n_txs}</td>
+        <td><span class="reward-badge">50 SILVR</span></td>
+      `;
+      tbody.appendChild(tr);
+    });
+  } catch(e) {
+    document.getElementById('blocks-body').innerHTML =
+      '<tr><td colspan="6" class="error" style="padding:20px">Failed to load blocks</td></tr>';
+  }
+}
+
+/* ── Search ── */
+function searchHash(hash) {
+  document.getElementById('search-input').value = hash;
+  document.querySelector('input[value="tx"]').checked = true;
+  doSearch();
+}
+
+async function doSearch() {
+  const val   = document.getElementById('search-input').value.trim();
+  const stype = document.querySelector('input[name="stype"]:checked').value;
+  const el    = document.getElementById('search-result');
+
+  if (!val) return;
+  el.className = 'search-result show';
+  el.innerHTML = '<div class="loading">Searching...</div>';
+
+  try {
+    let data, rows = '';
+
+    if (stype === 'tx') {
+      data = await apiFetch('/tx?id=' + val);
+      if (data.error) throw new Error(data.error);
+      rows = `
+        <div class="result-row"><span class="result-key">TXID</span>
+          <span class="result-val">${data.txid}</span></div>
+        <div class="result-row"><span class="result-key">Block Height</span>
+          <span class="result-val">#${data.block_height}</span></div>
+        <div class="result-row"><span class="result-key">Version</span>
+          <span class="result-val">${data.version}</span></div>
+        <div class="result-row"><span class="result-key">Inputs</span>
+          <span class="result-val">${data.n_inputs}</span></div>
+        <div class="result-row"><span class="result-key">Outputs</span>
+          <span class="result-val">${data.n_outputs}</span></div>
+        ${data.outputs.map((o,i) => `
+        <div class="result-row">
+          <span class="result-key">Output ${i}</span>
+          <span class="result-val">${o.amount.toFixed(8)} SILVR → ${o.pubkey_hash}</span>
+        </div>`).join('')}
+      `;
+    } else if (stype === 'addr') {
+      data = await apiFetch('/balance?addr=' + val);
+      if (data.error) throw new Error(data.error);
+      rows = `
+        <div class="result-row"><span class="result-key">Address</span>
+          <span class="result-val">${data.address}</span></div>
+        <div class="result-row"><span class="result-key">Balance</span>
+          <span class="result-val" style="color:var(--green); font-size:16px">
+            ${data.balance.toFixed(8)} SILVR</span></div>
+      `;
+    } else {
+      data = await apiFetch('/block?h=' + val);
+      if (data.error) throw new Error(data.error);
+      rows = `
+        <div class="result-row"><span class="result-key">Height</span>
+          <span class="result-val">#${data.height}</span></div>
+        <div class="result-row"><span class="result-key">Hash</span>
+          <span class="result-val">${data.hash}</span></div>
+        <div class="result-row"><span class="result-key">Prev Hash</span>
+          <span class="result-val">${data.prev_hash}</span></div>
+        <div class="result-row"><span class="result-key">Merkle Root</span>
+          <span class="result-val">${data.merkle_root}</span></div>
+        <div class="result-row"><span class="result-key">Timestamp</span>
+          <span class="result-val">${new Date(data.timestamp*1000).toLocaleString()}</span></div>
+        <div class="result-row"><span class="result-key">Nonce</span>
+          <span class="result-val">${data.nonce.toLocaleString()}</span></div>
+        <div class="result-row"><span class="result-key">Difficulty</span>
+          <span class="result-val">${data.difficulty} bits</span></div>
+        <div class="result-row"><span class="result-key">Transactions</span>
+          <span class="result-val">${data.n_txs}</span></div>
+      `;
+    }
+    el.innerHTML = rows;
+  } catch(e) {
+    el.innerHTML = `<div class="error">❌ ${e.message}</div>`;
+  }
+}
+
+/* Allow Enter key in search */
+document.getElementById('search-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doSearch();
+});
+
+/* ── Main loop ── */
+async function refresh() {
+  await updateStatus();
+  await updateBlocks();
+}
+
+refresh();
+setInterval(refresh, 5000); /* refresh every 5 seconds */
 </script>
 </body>
 </html>
