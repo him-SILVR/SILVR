@@ -255,6 +255,87 @@ static void copy_keypair_address(silvr_keypair_t *dst,
 }
 
 /* =========================================================================
+ * P2P SERVER — Accept incoming connections from Replit / other nodes
+ * ========================================================================= */
+static DWORD WINAPI peer_recv_thread(LPVOID arg) {
+    silvr_peer_t *peer = (silvr_peer_t *)arg;
+    silvr_msg_type_t type;
+    uint8_t  *payload;
+    uint32_t  plen;
+
+    while (peer->connected) {
+        if (p2p_recv_msg(peer->sock, &type, &payload, &plen) != 0)
+            break;
+        p2p_dispatch(peer, type, payload, plen,
+                     find_block_by_hash,
+                     (const uint8_t (*)[32])g_block_hashes,
+                     g_chain_height,
+                     g_best_hash,
+                     &g_best_height);
+        if (payload) free(payload);
+    }
+    peer->connected = 0;
+    CLOSE_SOCKET(peer->sock);
+    printf("[SERVER] Peer %s disconnected\n", peer->ip);
+    return 0;
+}
+
+static DWORD WINAPI p2p_server_thread(LPVOID arg) {
+    (void)arg;
+    silvr_socket_t srv = socket(AF_INET, SOCK_STREAM, 0);
+    if (srv == INVALID_SOCKET) {
+        fprintf(stderr, "[SERVER] socket() failed\n");
+        return 1;
+    }
+    int yes = 1;
+    setsockopt(srv, SOL_SOCKET, SO_REUSEADDR, (char *)&yes, sizeof(yes));
+
+    struct sockaddr_in sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sin_family      = AF_INET;
+    sa.sin_addr.s_addr = INADDR_ANY;
+    sa.sin_port        = htons(SILVR_PORT);
+
+    if (bind(srv, (struct sockaddr *)&sa, sizeof(sa)) != 0) {
+        fprintf(stderr, "[SERVER] bind() failed on port %d — error %d\n",
+                SILVR_PORT, WSAGetLastError());
+        CLOSE_SOCKET(srv);
+        return 1;
+    }
+    listen(srv, 8);
+    printf("[SERVER] Listening for P2P connections on port %d\n", SILVR_PORT);
+
+    while (1) {
+        struct sockaddr_in ca;
+        int calen = sizeof(ca);
+        silvr_socket_t cfd = accept(srv, (struct sockaddr *)&ca, &calen);
+        if (cfd == INVALID_SOCKET) continue;
+
+        if (g_peer_count >= SILVR_MAX_PEERS) {
+            CLOSE_SOCKET(cfd);
+            continue;
+        }
+
+        silvr_peer_t *peer = &g_peers[g_peer_count++];
+        memset(peer, 0, sizeof(*peer));
+        peer->sock          = cfd;
+        peer->port          = ntohs(ca.sin_port);
+        peer->connected     = 1;
+        peer->last_msg_time = time(NULL);
+        inet_ntop(AF_INET, &ca.sin_addr, peer->ip, sizeof(peer->ip));
+
+        printf("[SERVER] Peer connected: %s:%d (slot %u)\n",
+               peer->ip, peer->port, g_peer_count - 1);
+
+        p2p_send_hello(peer);
+
+        HANDLE t = CreateThread(NULL, 0, peer_recv_thread, peer, 0, NULL);
+        if (t) CloseHandle(t);
+    }
+    return 0;
+}
+
+/* =========================================================================
  * MAIN
  * ========================================================================= */
 int main(int argc, char *argv[]) {
@@ -273,13 +354,11 @@ int main(int argc, char *argv[]) {
     memset(saved_addr,   0, 40);
 
     if (load_miner_address(saved_pkhash, saved_addr) == 0) {
-        /* Use your original v2.4 address */
         printf("[NODE] Loaded migrated address: %s\n", saved_addr);
         memcpy(g_miner_kp.pkhash, saved_pkhash, 20);
         strncpy(g_miner_kp.addr_str, saved_addr,
                 sizeof(g_miner_kp.addr_str) - 1);
     } else {
-        /* No migration file — generate fresh keypair */
         printf("[NODE] Generating new miner keypair...\n");
         if (crypto_keygen(&g_miner_kp) != SILVR_OK) {
             fprintf(stderr, "[NODE] Keygen failed\n");
@@ -288,20 +367,23 @@ int main(int argc, char *argv[]) {
         printf("[NODE] Miner: %s\n", g_miner_kp.addr_str);
     }
 
-    /* Treasury = Miner. Full 50 SILVR per block to one address. */
     copy_keypair_address(&g_treasury_kp, &g_miner_kp);
     printf("[NODE] Miner    : %s\n", g_miner_kp.addr_str);
     printf("[NODE] Treasury : %s (same)\n", g_treasury_kp.addr_str);
     printf("[NODE] Full 50 SILVR per block to your address.\n\n");
 
-    /* Load or create chain */
     chain_load();
     if (g_chain_height == 0) {
         create_genesis_block();
         chain_save();
     }
 
-    /* Connect to peer if IP provided as argument */
+    /* Start P2P server — listens on port 8633 for incoming nodes */
+    HANDLE srv_t = CreateThread(NULL, 0, p2p_server_thread, NULL, 0, NULL);
+    if (srv_t) CloseHandle(srv_t);
+    else fprintf(stderr, "[SERVER] Failed to start server thread\n");
+
+    /* Connect outbound to peer if IP given as argument */
     if (argc >= 2) {
         printf("[NODE] Connecting to peer: %s\n", argv[1]);
         silvr_peer_t *peer = p2p_connect(argv[1], SILVR_PORT);
