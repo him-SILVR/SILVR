@@ -99,7 +99,7 @@ typedef struct {
 /* =========================================================================
  * FULL BLOCK
  * ========================================================================= */
-#define MAX_TXS_PER_BLOCK 512
+#define MAX_TXS_PER_BLOCK 8
 typedef struct {
     silvr_block_header_t header;
     uint8_t              block_hash[32];
